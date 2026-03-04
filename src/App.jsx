@@ -231,7 +231,7 @@ export default function CTRDashboard() {
       <header style={{
         borderBottom: "1px solid #1e293b",
         background: "linear-gradient(180deg,#0a0e1a 0%,#050812 100%)",
-        padding: "0 40px",
+        padding: "0 16px 60px",
         position: "sticky", top: 0, zIndex: 100,
       }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
@@ -261,7 +261,7 @@ export default function CTRDashboard() {
         </div>
       </header>
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "36px 40px 0" }}>
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "36px 16px 0" }}>
 
         {/* ── Top stats row ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 16, marginBottom: 36 }}>
