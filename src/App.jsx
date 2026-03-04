@@ -150,8 +150,12 @@ export default function CTRDashboard() {
               <div style={{ fontSize: 10, color: "#475569", letterSpacing: ".08em" }}>CTR · CRONOS EVM</div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <span style={{ fontSize: 12, color: "#64ffda", fontFamily: "'DM Mono',monospace", whiteSpace: "nowrap" }}>${fmt(ctr.price, 5)}</span>
+            <a href="https://x.com/CronosTreasury" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#e2e8f0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.741l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+              <span style={{ fontSize: 10, color: "#e2e8f0", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>@CronosTreasury</span>
+            </a>
             <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 99, padding: "4px 10px" }}>
               <span className="live-dot" style={{ width: 6, height: 6, background: "#64ffda", borderRadius: "50%", display: "inline-block" }} />
               <span style={{ fontSize: 10, color: "#64ffda", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>LIVE</span>
