@@ -144,7 +144,7 @@ export default function CTRDashboard() {
       <header style={{ borderBottom: "1px solid #1e293b", background: "#0a0e1a", padding: "0 16px", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56, gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <img src="/CTR.github.io/Logo1.jpg" alt="CTR Logo" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+            <img src="/cronostreasury.github.io/Logo1.jpg" alt="CTR Logo" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Cronos Treasury Reserve</div>
               <div style={{ fontSize: 10, color: "#475569", letterSpacing: ".08em" }}>CTR · CRONOS EVM</div>
