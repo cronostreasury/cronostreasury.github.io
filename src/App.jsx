@@ -17,21 +17,7 @@ const MOCK_CTR = {
   totalBurned: 0,
 };
 
-const generateBuybackEvents = () => {
-  const events = [];
-  const now = Date.now();
-  for (let i = 19; i >= 0; i--) {
-    const bought = Math.floor(Math.random() * 900_000 + 100_000);
-    const burned = Math.floor(bought * (0.85 + Math.random() * 0.1));
-    events.push({
-      id: i,
-      ts: new Date(now - i * 7_200_000 - Math.random() * 3_600_000),
-      bought, burned,
-      txHash: "0x" + [...Array(64)].map(() => Math.floor(Math.random()*16).toString(16)).join(""),
-    });
-  }
-  return events.reverse();
-};
+
 
 const fmt = (n, dec = 2) => n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const fmtCompact = (n) => n >= 1e6 ? `${(n/1e6).toFixed(2)}M` : n >= 1e3 ? `${(n/1e3).toFixed(1)}K` : n.toFixed(0);
@@ -104,7 +90,7 @@ function useCounter(target, duration = 1200) {
 }
 
 export default function CTRDashboard() {
-  const [events, setEvents] = useState(() => generateBuybackEvents());
+  const [events, setEvents] = useState([]);
   const [newIds, setNewIds] = useState(new Set());
   const [livePrice, setLivePrice] = useState(null);
   const [priceChange24h, setPriceChange24h] = useState(null);
@@ -193,21 +179,7 @@ export default function CTRDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Simulated buyback events
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const bought = Math.floor(Math.random() * 900_000 + 100_000);
-      const burned = Math.floor(bought * 0.9);
-      const newEvent = {
-        id: Date.now(), ts: new Date(), bought, burned,
-        txHash: "0x" + [...Array(64)].map(() => Math.floor(Math.random()*16).toString(16)).join(""),
-      };
-      setEvents(prev => [newEvent, ...prev.slice(0, 19)]);
-      setNewIds(s => { const n = new Set(s); n.add(newEvent.id); return n; });
-      setTimeout(() => setNewIds(s => { const n = new Set(s); n.delete(newEvent.id); return n; }), 4000);
-    }, 25000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   const displayChange = priceChange24h !== null ? priceChange24h : 0;
   const changeColor = displayChange >= 0 ? "#64ffda" : "#ff6b6b";
@@ -442,7 +414,13 @@ export default function CTRDashboard() {
                 <div key={h} style={{ fontSize: 10, color: "#475569", letterSpacing: ".1em", textTransform: "uppercase" }}>{h}</div>
               ))}
             </div>
-            {events.map(e => (
+            {events.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: "#475569", fontSize: 13 }}>
+                <div style={{ fontSize: 28, marginBottom: 12 }}>🔥</div>
+                <div style={{ color: "#64748b", fontFamily: "'DM Mono',monospace" }}>No buyback events yet</div>
+                <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>Events will appear here once the buyback program launches</div>
+              </div>
+            ) : events.map(e => (
               <div key={e.id} className={`feed-row${newIds.has(e.id) ? " new-row" : ""}`} style={{ background: newIds.has(e.id) ? "#64ffda08" : "transparent" }}>
                 <div>
                   <div style={{ color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>{timeAgo(e.ts)}</div>
