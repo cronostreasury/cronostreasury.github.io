@@ -1,0 +1,32 @@
+name: Treasury Snapshot
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at 00:00 UTC
+  workflow_dispatch:       # Allow manual trigger
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run snapshot script
+        run: node scripts/snapshot.js
+
+      - name: Commit & push snapshot
+        run: |
+          git config user.name "Treasury Bot"
+          git config user.email "bot@cronostreasury.github.io"
+          git add public/treasury-history.json
+          git diff --staged --quiet || git commit -m "📸 Daily treasury snapshot $(date +%Y-%m-%d)"
+          git push

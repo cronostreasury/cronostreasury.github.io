@@ -97,6 +97,7 @@ export default function CTRDashboard() {
   const [liveMarketCap, setLiveMarketCap] = useState(null);
   const [vaultTokens, setVaultTokens] = useState(TOKENS.map(t => ({ ...t, amount: 0, usdPrice: 0 })));
   const [vaultLoading, setVaultLoading] = useState(true);
+  const [treasuryHistory, setTreasuryHistory] = useState([]);
   const ctr = MOCK_CTR;
 
   const vaultTotal = vaultTokens.reduce((s, t) => s + t.amount * t.usdPrice, 0);
@@ -244,6 +245,7 @@ export default function CTRDashboard() {
           {[
             { label: "CTR Price", value: livePrice !== null ? `$${fmtPrice(livePrice)}` : "...", sub: priceChange24h !== null ? `${changePrefix}${displayChange.toFixed(2)}% (24h)` : "Loading...", c: changeColor },
             { label: "Market Cap", value: liveMarketCap !== null ? `$${fmtCompact(liveMarketCap)}` : "...", sub: "Live · DexScreener", c: "#7c3aed" },
+            { label: "Total Value", value: (liveMarketCap !== null && !vaultLoading) ? `$${fmtCompact(liveMarketCap + vaultTotal)}` : "...", sub: "Market Cap + Treasury", c: "#a78bfa" },
             { label: "Total Supply", value: "1,000.00M", sub: "Fixed supply", c: "#f59e0b" },
             { label: "Total Burned", value: "0 CTR", sub: "Burn program starting soon", c: "#ff6b6b" },
             { label: "Vault TVL", value: vaultLoading ? "Loading..." : `$${fmtCompact(animVault)}`, sub: "Live · Cronos RPC", c: "#64ffda" },
@@ -384,6 +386,107 @@ export default function CTRDashboard() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* Treasury Growth Chart */}
+        <div className="section-card">
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 16 }}>Treasury Growth</div>
+              <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>Daily TVL snapshot · auto-updated</div>
+            </div>
+            {treasuryHistory.length > 0 && (
+              <div style={{ fontSize: 11, color: "#64ffda", fontFamily: "'DM Mono',monospace", background: "#0d2419", border: "1px solid #64ffda33", borderRadius: 8, padding: "4px 10px" }}>
+                {treasuryHistory.length}d of data
+              </div>
+            )}
+          </div>
+          <div style={{ padding: 24 }}>
+            {treasuryHistory.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                <div style={{ fontSize: 28, marginBottom: 12 }}>📈</div>
+                <div style={{ color: "#64748b", fontFamily: "'DM Mono',monospace", fontSize: 13 }}>No history yet</div>
+                <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>Daily snapshots will appear here starting tomorrow</div>
+              </div>
+            ) : (() => {
+              const W = 800, H = 200, PAD = { top: 16, right: 16, bottom: 32, left: 56 };
+              const vals = treasuryHistory.map(d => d.tvl);
+              const minV = Math.min(...vals) * 0.95;
+              const maxV = Math.max(...vals) * 1.05;
+              const n = treasuryHistory.length;
+              const xScale = i => PAD.left + (i / Math.max(n - 1, 1)) * (W - PAD.left - PAD.right);
+              const yScale = v => PAD.top + (1 - (v - minV) / (maxV - minV)) * (H - PAD.top - PAD.bottom);
+              const points = treasuryHistory.map((d, i) => `${xScale(i)},${yScale(d.tvl)}`).join(" ");
+              const areaPoints = `${xScale(0)},${H - PAD.bottom} ` + points + ` ${xScale(n-1)},${H - PAD.bottom}`;
+              const latest = treasuryHistory[n - 1];
+              const first = treasuryHistory[0];
+              const change = ((latest.tvl - first.tvl) / first.tvl * 100);
+              const changeColor = change >= 0 ? "#64ffda" : "#ff6b6b";
+              // Y axis ticks
+              const yTicks = [0, 0.25, 0.5, 0.75, 1].map(p => ({
+                v: minV + p * (maxV - minV),
+                y: PAD.top + (1 - p) * (H - PAD.top - PAD.bottom)
+              }));
+              // X axis ticks — show every ~7 days
+              const step = Math.max(1, Math.floor(n / 6));
+              const xTicks = treasuryHistory.filter((_, i) => i % step === 0 || i === n - 1);
+              return (
+                <div>
+                  <div style={{ display: "flex", gap: 24, marginBottom: 20 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#64748b", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 4 }}>Current TVL</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: "#64ffda" }}>${fmtCompact(latest.tvl)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#64748b", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 4 }}>All-time change</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: changeColor }}>
+                        {change >= 0 ? "+" : ""}{change.toFixed(1)}%
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#64748b", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 4 }}>Since</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: "#94a3b8" }}>{first.date}</div>
+                    </div>
+                  </div>
+                  <div style={{ overflowX: "auto" }}>
+                    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 300, display: "block" }}>
+                      {/* Grid lines */}
+                      {yTicks.map((t, i) => (
+                        <g key={i}>
+                          <line x1={PAD.left} y1={t.y} x2={W - PAD.right} y2={t.y} stroke="#1e293b" strokeWidth="1" />
+                          <text x={PAD.left - 6} y={t.y + 4} textAnchor="end" fill="#475569" fontSize="9" fontFamily="monospace">
+                            ${fmtCompact(t.v)}
+                          </text>
+                        </g>
+                      ))}
+                      {/* Area fill */}
+                      <polygon points={areaPoints} fill="url(#tvlGrad)" opacity="0.3" />
+                      {/* Line */}
+                      <polyline points={points} fill="none" stroke="#64ffda" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                      {/* Gradient def */}
+                      <defs>
+                        <linearGradient id="tvlGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#64ffda" stopOpacity="0.6" />
+                          <stop offset="100%" stopColor="#64ffda" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      {/* Latest point dot */}
+                      <circle cx={xScale(n-1)} cy={yScale(latest.tvl)} r="4" fill="#64ffda" />
+                      {/* X axis labels */}
+                      {xTicks.map((d, i) => {
+                        const idx = treasuryHistory.indexOf(d);
+                        return (
+                          <text key={i} x={xScale(idx)} y={H - 6} textAnchor="middle" fill="#475569" fontSize="8" fontFamily="monospace">
+                            {d.date.slice(5)}
+                          </text>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
