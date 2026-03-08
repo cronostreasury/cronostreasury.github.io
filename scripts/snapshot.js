@@ -1,8 +1,9 @@
-// GitHub Action script: scripts/snapshot.js
-// Run daily via cron — fetches wallet balances + prices, appends to public/treasury-history.json
+// scripts/snapshot.js — ES Module (compatible with "type": "module" in package.json)
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const fs = require("fs");
-const path = require("path");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const WALLET = "0x96a6cd06338efe754f200aba9ff07788c16e5f20";
 const CRONOS_RPC = "https://evm.cronos.org";
@@ -72,21 +73,18 @@ async function main() {
   });
 
   const snapshot = {
-    date: new Date().toISOString().split("T")[0], // YYYY-MM-DD
+    date: new Date().toISOString().split("T")[0],
     tvl: parseFloat(tvl.toFixed(2)),
     holdings,
   };
 
   console.log(`✅ TVL: $${tvl.toFixed(2)}`);
-  console.log("Holdings:", JSON.stringify(holdings, null, 2));
 
-  // Load existing history
   let history = [];
   if (fs.existsSync(HISTORY_FILE)) {
     history = JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8"));
   }
 
-  // Replace today's entry if exists, else append
   const todayIdx = history.findIndex(e => e.date === snapshot.date);
   if (todayIdx >= 0) {
     history[todayIdx] = snapshot;
@@ -96,7 +94,6 @@ async function main() {
     console.log("➕ Added new entry");
   }
 
-  // Keep max 365 days
   if (history.length > 365) history = history.slice(-365);
 
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
