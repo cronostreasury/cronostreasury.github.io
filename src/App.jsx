@@ -61,7 +61,7 @@ function PieChart({ data }) {
   return (
     <svg viewBox="0 0 100 100" style={{ width: "100%", maxWidth: 180, display: "block", margin: "0 auto" }}>
       {slices.map((s, i) => (
-        <path key={i} d={s.d} fill={s.color} stroke="#0a0e1a" strokeWidth="1.5" />
+        <path key={i} d={s.d} fill={s.color} stroke="#06090f" strokeWidth="1.5" />
       ))}
       <circle cx="50" cy="50" r="28" fill="#0a0e1a" />
       <text x="50" y="47" textAnchor="middle" fill="#e2e8f0" fontSize="6" fontFamily="monospace" fontWeight="bold">VAULT</text>
@@ -87,6 +87,178 @@ function useCounter(target, duration = 1200) {
     requestAnimationFrame(tick);
   }, [target]);
   return val;
+}
+
+
+function BackgroundCanvas() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    let animId;
+    let w, h;
+    const GRID = 60;
+
+    const resize = () => {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    // Particles
+    const particles = Array.from({ length: 70 }, () => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      r: Math.random() * 2 + 0.6,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      alpha: Math.random() * 0.6 + 0.2,
+    }));
+
+    // Electricity pulses along grid lines
+    const pulses = [];
+    const spawnPulse = () => {
+      const horiz = Math.random() > 0.5;
+      if (horiz) {
+        const row = Math.floor(Math.random() * Math.ceil(h / GRID)) * GRID;
+        pulses.push({ horiz: true, pos: -GRID, fixed: row, speed: 2 + Math.random() * 3, len: 40 + Math.random() * 80, alpha: 0.5 + Math.random() * 0.3, color: "220,240,255" });
+      } else {
+        const col = Math.floor(Math.random() * Math.ceil(w / GRID)) * GRID;
+        pulses.push({ horiz: false, pos: -GRID, fixed: col, speed: 2 + Math.random() * 3, len: 40 + Math.random() * 80, alpha: 0.5 + Math.random() * 0.3, color: "220,240,255" });
+      }
+    };
+
+    // Spawn pulses regularly
+    let spawnTimer = 0;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, w, h);
+
+      // Static grid
+      ctx.lineWidth = 1;
+      const cols = Math.ceil(w / GRID);
+      const rows = Math.ceil(h / GRID);
+      for (let i = 0; i <= cols; i++) {
+        ctx.strokeStyle = "rgba(100, 255, 218, 0.06)";
+        ctx.beginPath(); ctx.moveTo(i * GRID, 0); ctx.lineTo(i * GRID, h); ctx.stroke();
+      }
+      for (let j = 0; j <= rows; j++) {
+        ctx.strokeStyle = "rgba(100, 255, 218, 0.06)";
+        ctx.beginPath(); ctx.moveTo(0, j * GRID); ctx.lineTo(w, j * GRID); ctx.stroke();
+      }
+
+      // Draw & update electricity pulses
+      for (let i = pulses.length - 1; i >= 0; i--) {
+        const p = pulses[i];
+        p.pos += p.speed;
+
+        // Glowing pulse along grid line
+        if (p.horiz) {
+          const grad = ctx.createLinearGradient(p.pos - p.len, p.fixed, p.pos, p.fixed);
+          grad.addColorStop(0, `rgba(${p.color}, 0)`);
+          grad.addColorStop(0.4, `rgba(${p.color}, ${p.alpha * 0.4})`);
+          grad.addColorStop(0.8, `rgba(${p.color}, ${p.alpha})`);
+          grad.addColorStop(1, `rgba(${p.color}, 0.1)`);
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(Math.max(0, p.pos - p.len), p.fixed);
+          ctx.lineTo(p.pos, p.fixed);
+          ctx.stroke();
+          // Bright head dot
+          ctx.beginPath();
+          ctx.arc(p.pos, p.fixed, 2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${p.color}, ${p.alpha})`;
+          ctx.fill();
+          // Glow halo
+          const glow = ctx.createRadialGradient(p.pos, p.fixed, 0, p.pos, p.fixed, 8);
+          glow.addColorStop(0, `rgba(${p.color}, 0.3)`);
+          glow.addColorStop(1, `rgba(${p.color}, 0)`);
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(p.pos, p.fixed, 8, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          const grad = ctx.createLinearGradient(p.fixed, p.pos - p.len, p.fixed, p.pos);
+          grad.addColorStop(0, `rgba(${p.color}, 0)`);
+          grad.addColorStop(0.4, `rgba(${p.color}, ${p.alpha * 0.4})`);
+          grad.addColorStop(0.8, `rgba(${p.color}, ${p.alpha})`);
+          grad.addColorStop(1, `rgba(${p.color}, 0.1)`);
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(p.fixed, Math.max(0, p.pos - p.len));
+          ctx.lineTo(p.fixed, p.pos);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(p.fixed, p.pos, 2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${p.color}, ${p.alpha})`;
+          ctx.fill();
+          const glow = ctx.createRadialGradient(p.fixed, p.pos, 0, p.fixed, p.pos, 8);
+          glow.addColorStop(0, `rgba(${p.color}, 0.3)`);
+          glow.addColorStop(1, `rgba(${p.color}, 0)`);
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(p.fixed, p.pos, 8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Remove if off screen
+        if (p.pos > (p.horiz ? w + p.len : h + p.len)) pulses.splice(i, 1);
+      }
+
+      // Spawn new pulse every ~30 frames
+      spawnTimer++;
+      if (spawnTimer > 90) { spawnPulse(); spawnTimer = 0; }
+
+      // Particles
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = p.x - particles[j].x;
+          const dy = p.y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 160) {
+            ctx.strokeStyle = `rgba(100, 255, 218, ${0.15 * (1 - dist / 160)})`;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(100, 255, 218, ${p.alpha})`;
+        ctx.fill();
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
+        if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
+      }
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: "fixed", top: 0, left: 0,
+        width: "100%", height: "100%",
+        pointerEvents: "none", zIndex: 0,
+      }}
+    />
+  );
 }
 
 export default function CTRDashboard() {
@@ -187,7 +359,8 @@ export default function CTRDashboard() {
   const changePrefix = displayChange >= 0 ? "+" : "";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#050812", color: "#e2e8f0", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#020408", color: "#e2e8f0", fontFamily: "system-ui, sans-serif", position: "relative" }}>
+      <BackgroundCanvas />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -198,24 +371,24 @@ export default function CTRDashboard() {
         .live-dot { animation: pulse 2s infinite; }
         .new-row { animation: slideIn .4s ease; }
         .spinner { animation: spin 1s linear infinite; }
-        .stat-card { background: linear-gradient(135deg,#0d1226,#111827); border: 1px solid #1e293b; border-radius: 12px; padding: 16px 20px; }
-        .section-card { background: #0d1226; border: 1px solid #1e293b; border-radius: 16px; overflow: hidden; margin-bottom: 16px; }
+        .stat-card { background: linear-gradient(135deg,#141d35,#1a2440); border: 1px solid #1e293b; border-radius: 12px; padding: 16px 20px; transition: border-color 0.3s, box-shadow 0.3s; } .stat-card:hover { border-color: rgba(100,255,218,0.25); box-shadow: 0 0 24px rgba(100,255,218,0.12), 0 4px 24px rgba(0,0,0,0.4); }
+        .section-card { background: #111827; border: 1px solid #1e2940; border-radius: 16px; overflow: hidden; margin-bottom: 16px; transition: border-color 0.3s, box-shadow 0.3s; box-shadow: 0 0 0px rgba(100,255,218,0); } .section-card:hover { border-color: rgba(100,255,218,0.15); box-shadow: 0 0 32px rgba(100,255,218,0.10), 0 8px 32px rgba(0,0,0,0.5); }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
         .how-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
         .holdings-table { width: 100%; border-collapse: collapse; }
         .holdings-table th { padding: 10px 16px; font-size: 10px; color: #475569; text-align: left; letter-spacing: .1em; text-transform: uppercase; background: #111827; font-weight: 500; }
-        .holdings-table td { padding: 12px 16px; border-bottom: 1px solid #1e293b; font-size: 13px; }
+        .holdings-table td { padding: 12px 16px; border-bottom: 1px solid #243152; font-size: 13px; }
         .holdings-table tr:last-child td { border-bottom: none; }
-        .feed-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #1e293b; align-items: center; font-size: 12px; }
+        .feed-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #243152; align-items: center; font-size: 12px; }
         @media (max-width: 500px) { .feed-row { grid-template-columns: 1fr 1fr; } .feed-row .tx-col { display: none; } }
         ::-webkit-scrollbar { width: 4px; background: #0a0e1a; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
       `}</style>
 
       {/* Header */}
-      <header style={{ borderBottom: "1px solid #1e293b", background: "#0a0e1a", padding: "0 16px", position: "sticky", top: 0, zIndex: 100 }}>
+      <header style={{ borderBottom: "1px solid #243152", background: "#06090f", padding: "0 16px", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", background: "rgba(5, 8, 18, 0.92)" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56, gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             <img src="/Logo1.jpg" alt="CTR Logo" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
@@ -225,7 +398,7 @@ export default function CTRDashboard() {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            <a href="https://x.com/CronosTreasury" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
+            <a href="https://x.com/CronosTreasury" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="#e2e8f0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.741l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
               <span style={{ fontSize: 10, color: "#e2e8f0", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>@CronosTreasury</span>
             </a>
@@ -239,7 +412,7 @@ export default function CTRDashboard() {
                 </div>
               )}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #1e293b", borderRadius: 99, padding: "4px 10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px" }}>
               <span className="live-dot" style={{ width: 6, height: 6, background: "#64ffda", borderRadius: "50%", display: "inline-block" }} />
               <span style={{ fontSize: 10, color: "#64ffda", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>LIVE</span>
             </div>
@@ -247,7 +420,7 @@ export default function CTRDashboard() {
         </div>
       </header>
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px 60px" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px 60px", position: "relative", zIndex: 1 }}>
 
         {/* Stats */}
         <div className="stats-grid">
@@ -270,7 +443,7 @@ export default function CTRDashboard() {
         {/* Vault + Burn */}
         <div className="grid-2">
           <div className="section-card">
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #243152", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 16 }}>Vault Composition</div>
                 <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>
@@ -313,7 +486,7 @@ export default function CTRDashboard() {
           </div>
 
           <div className="section-card">
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e293b" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #243152" }}>
               <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 16 }}>Burn Analytics</div>
               <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>Cumulative supply reduction</div>
             </div>
@@ -333,7 +506,7 @@ export default function CTRDashboard() {
                   { label: "Burn Rate", val: "Starting soon", c: "#f59e0b" },
                   { label: "Est. Deflation", val: "TBD", c: "#7c3aed" },
                 ].map(s => (
-                  <div key={s.label} style={{ background: "#111827", borderRadius: 10, padding: "10px 14px" }}>
+                  <div key={s.label} style={{ background: "#1a2440", borderRadius: 10, padding: "10px 14px" }}>
                     <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{s.label}</div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: s.c, fontFamily: "'DM Mono',monospace" }}>{s.val}</div>
                   </div>
@@ -345,7 +518,7 @@ export default function CTRDashboard() {
 
         {/* Holdings Table */}
         <div className="section-card">
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #243152", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 16 }}>Treasury Holdings</div>
             <div style={{ fontSize: 11, color: "#475569", fontFamily: "'DM Mono',monospace" }}>
               {vaultLoading ? "Loading..." : `Updated ${new Date().toLocaleTimeString()}`}
@@ -400,7 +573,7 @@ export default function CTRDashboard() {
 
         {/* Treasury Growth Chart */}
         <div className="section-card">
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #243152", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 16 }}>Treasury Growth</div>
               <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>Daily TVL snapshot · auto-updated</div>
@@ -501,7 +674,7 @@ export default function CTRDashboard() {
 
         {/* Buyback Feed */}
         <div className="section-card">
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #243152", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 16 }}>Buyback & Burn Activity</div>
               <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>Real-time on-chain events</div>
@@ -512,7 +685,7 @@ export default function CTRDashboard() {
             </div>
           </div>
           <div style={{ padding: "0 0 8px" }}>
-            <div className="feed-row" style={{ borderBottom: "1px solid #1e293b" }}>
+            <div className="feed-row" style={{ borderBottom: "1px solid #243152" }}>
               {["Time", "Bought", "Burned", "Tx Hash"].map(h => (
                 <div key={h} style={{ fontSize: 10, color: "#475569", letterSpacing: ".1em", textTransform: "uppercase" }}>{h}</div>
               ))}
@@ -543,7 +716,7 @@ export default function CTRDashboard() {
 
         {/* How It Works */}
         <div className="section-card">
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e293b" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #243152" }}>
             <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 16 }}>How CTR Works</div>
           </div>
           <div style={{ padding: 20 }}>
@@ -554,7 +727,7 @@ export default function CTRDashboard() {
                 { icon: "🔥", title: "Burn & Deflation", color: "#ff6b6b", text: "Bought-back CTR is permanently burned, reducing supply. Fewer tokens + growing treasury = higher backing." },
                 { icon: "📊", title: "Transparency", color: "#f59e0b", text: "All transactions are on-chain on Cronos EVM and verifiable on the block explorer in real time." },
               ].map(s => (
-                <div key={s.title} style={{ background: "#111827", borderRadius: 12, padding: 16, borderLeft: `3px solid ${s.color}` }}>
+                <div key={s.title} style={{ background: "#1a2440", borderRadius: 12, padding: 16, borderLeft: `3px solid ${s.color}` }}>
                   <div style={{ fontSize: 22, marginBottom: 8 }}>{s.icon}</div>
                   <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14, marginBottom: 6, color: s.color }}>{s.title}</div>
                   <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>{s.text}</div>
