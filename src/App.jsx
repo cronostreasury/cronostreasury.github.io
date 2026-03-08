@@ -274,7 +274,7 @@ export default function CTRDashboard() {
 
   const vaultTotal = vaultTokens.reduce((s, t) => s + t.amount * t.usdPrice, 0);
   const animVault = useCounter(vaultTotal);
-  const pieData = vaultTokens.filter(t => t.amount * t.usdPrice > 0).map(t => ({ symbol: t.symbol, value: t.amount * t.usdPrice, color: t.color }));
+  const pieData = vaultTokens.filter(t => t.symbol !== "CTR" && t.amount * t.usdPrice > 0).map(t => ({ symbol: t.symbol, value: t.amount * t.usdPrice, color: t.color }));
 
   // Fetch CTR price from DexScreener
   useEffect(() => {
