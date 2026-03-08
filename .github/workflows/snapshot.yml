@@ -2,8 +2,8 @@ name: Treasury Snapshot
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Daily at 00:00 UTC
-  workflow_dispatch:       # Allow manual trigger
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   snapshot:
@@ -42,6 +42,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+
+      - name: Pull latest (including snapshot commit)
+        run: git pull origin main
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
