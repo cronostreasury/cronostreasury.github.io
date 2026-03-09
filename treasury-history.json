@@ -3,12 +3,72 @@
     "date": "2026-03-08",
     "tvl": 7093.25,
     "holdings": {
-      "CDCBTC": { "amount": 0, "price": 67020.44, "value": 0 },
-      "CDCETH": { "amount": 0, "price": 2096.64, "value": 0 },
-      "LCRO":   { "amount": 0, "price": 0.09321, "value": 0 },
-      "USDC":   { "amount": 0, "price": 1, "value": 0 },
-      "PACK":   { "amount": 0, "price": 0.0001786, "value": 0 },
-      "CTR":    { "amount": 146675926.93762094, "price": 0.00004836, "value": 7093.25 }
+      "CDCBTC": {
+        "amount": 0,
+        "price": 67020.44,
+        "value": 0
+      },
+      "CDCETH": {
+        "amount": 0,
+        "price": 2096.64,
+        "value": 0
+      },
+      "LCRO": {
+        "amount": 0,
+        "price": 0.09321,
+        "value": 0
+      },
+      "USDC": {
+        "amount": 0,
+        "price": 1,
+        "value": 0
+      },
+      "PACK": {
+        "amount": 0,
+        "price": 0.0001786,
+        "value": 0
+      },
+      "CTR": {
+        "amount": 146675926.93762094,
+        "price": 0.00004836,
+        "value": 7093.25
+      }
+    }
+  },
+  {
+    "date": "2026-03-09",
+    "tvl": 9277.64,
+    "holdings": {
+      "CDCBTC": {
+        "amount": 0.0010097,
+        "price": 65554.29,
+        "value": 66.190166613
+      },
+      "CDCETH": {
+        "amount": 0.01378385171481024,
+        "price": 2080.62,
+        "value": 28.678957554868482
+      },
+      "LCRO": {
+        "amount": 507.42680000910264,
+        "price": 0.09384,
+        "value": 47.616930912854194
+      },
+      "USDC": {
+        "amount": 29,
+        "price": 1,
+        "value": 29
+      },
+      "PACK": {
+        "amount": 107701.64179698071,
+        "price": 0.0001782,
+        "value": 19.19243256822196
+      },
+      "CTR": {
+        "amount": 143826528.97596642,
+        "price": 0.00006318,
+        "value": 9086.960100701559
+      }
     }
   }
 ]
