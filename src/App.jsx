@@ -339,7 +339,12 @@ export default function CTRDashboard() {
           const price = parseFloat(pair.priceUsd);
           const liq = parseFloat(pair.liquidity?.usd || 0);
           if (addr && !isNaN(price) && (!priceMap[addr] || liq > priceMap[addr].liq)) {
-            priceMap[addr] = { price, liq };
+            priceMap[addr] = {
+              price, liq,
+              change24h: parseFloat(pair.priceChange?.h24) || 0,
+              change7d: parseFloat(pair.priceChange?.h24 * 7) || 0, // approximation if w1 not available
+              changeW1: parseFloat(pair.priceChange?.w1) || null,
+            };
           }
         });
 
@@ -351,7 +356,8 @@ export default function CTRDashboard() {
           } else if (priceMap[key]) {
             usdPrice = priceMap[key].price;
           }
-          return { ...t, amount: balances[i], usdPrice };
+          const changeData = priceMap[key] || {};
+          return { ...t, amount: balances[i], usdPrice, change24h: changeData.change24h || 0, change7d: changeData.changeW1 !== null ? changeData.changeW1 : changeData.change7d || 0 };
         });
 
         setVaultTokens(updated);
@@ -560,7 +566,7 @@ export default function CTRDashboard() {
             <table className="holdings-table">
               <thead>
                 <tr>
-                  <th>Asset</th><th>Balance</th><th>Price</th><th>USD Value</th><th>Allocation</th>
+                  <th>Asset</th><th>Balance</th><th>Price</th><th>USD Value</th><th>Allocation</th><th>24h</th><th>7d</th>
                 </tr>
               </thead>
               <tbody>
@@ -594,6 +600,12 @@ export default function CTRDashboard() {
                           </div>
                           <span style={{ fontSize: 11, color: "#64748b" }}>{pct}%</span>
                         </div>
+                      </td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: t.change24h >= 0 ? "#64ffda" : "#ff6b6b" }}>
+                        {t.symbol === "USDC" ? "—" : `${t.change24h >= 0 ? "+" : ""}${t.change24h?.toFixed(2)}%`}
+                      </td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: t.change7d >= 0 ? "#64ffda" : "#ff6b6b" }}>
+                        {t.symbol === "USDC" ? "—" : `${t.change7d >= 0 ? "+" : ""}${t.change7d?.toFixed(2)}%`}
                       </td>
                     </tr>
                   );
