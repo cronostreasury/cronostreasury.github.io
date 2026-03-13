@@ -16,7 +16,7 @@ const STAKED_PACK = {
   symbol: "PACK",
   name: "Pack Token (Staked)",
   label: "PACK (Staked)",
-  amount: 1114483,
+  amount: 1329159,
   address: "0x0d0b4a6FC6e7f5635C2FF38dE75AF2e96D6D6804",
   decimals: 18,
   color: "#E94040",
