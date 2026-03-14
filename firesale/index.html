@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CTR Firesale Friday 🔥 | Cronos Treasury Reserve</title>
 <meta name="description" content="Weekly CTR token sale at market price. Connect your wallet, place your bid, grab CTR before it's gone.">
-<link rel="icon" href="/cronostreasury.github.io/Logo1.jpg">
+<link rel="icon" href="/Logo1.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -33,21 +33,59 @@
     overflow-x: hidden;
   }
 
-  /* FIRE BG */
+  /* === FIRE BACKGROUND === */
   .fire-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
   .fire-bg::before {
     content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-    background: radial-gradient(ellipse at 20% 0%, #ff3d0015 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 0%, #ff6d0010 0%, transparent 50%),
+    background: radial-gradient(ellipse at 20% 0%, #ff3d0018 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 0%, #ff6d0012 0%, transparent 50%),
       radial-gradient(ellipse at 50% 100%, #0a0e1a 0%, transparent 70%);
     animation: firePulse 4s ease-in-out infinite alternate;
   }
   @keyframes firePulse { 0% { opacity:.6; transform:scale(1); } 100% { opacity:1; transform:scale(1.05); } }
-  .fire-bg .ember {
-    position: absolute; width: 4px; height: 4px; background: var(--fire-orange);
-    border-radius: 50%; filter: blur(1px); animation: emberRise linear infinite; opacity: 0;
+
+  /* Ember particles */
+  .ember {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    filter: blur(1px); animation: emberRise linear infinite; opacity: 0;
   }
-  @keyframes emberRise { 0% { opacity:0; transform:translateY(0) scale(1); } 20% { opacity:.8; } 100% { opacity:0; transform:translateY(-100vh) scale(0); } }
+  @keyframes emberRise {
+    0% { opacity:0; transform:translateY(0) scale(1) rotate(0deg); }
+    15% { opacity:.9; }
+    100% { opacity:0; transform:translateY(-110vh) scale(0) rotate(360deg); }
+  }
+
+  /* Flame lick animations on sides */
+  .flame-lick {
+    position: fixed; bottom: -20px; width: 60px; height: 120px; z-index: 1; pointer-events: none;
+    background: radial-gradient(ellipse at bottom, #ff3d0066 0%, #ff6d0033 30%, transparent 70%);
+    border-radius: 50% 50% 0 0;
+    animation: flameLick 2s ease-in-out infinite alternate;
+    filter: blur(8px);
+  }
+  .flame-lick:nth-child(1) { left: 2%; animation-delay: 0s; width: 50px; height: 100px; }
+  .flame-lick:nth-child(2) { left: 10%; animation-delay: 0.4s; width: 40px; height: 80px; }
+  .flame-lick:nth-child(3) { right: 5%; animation-delay: 0.2s; width: 55px; height: 110px; }
+  .flame-lick:nth-child(4) { right: 12%; animation-delay: 0.7s; width: 35px; height: 70px; }
+  .flame-lick:nth-child(5) { left: 25%; animation-delay: 1s; width: 30px; height: 60px; }
+  .flame-lick:nth-child(6) { right: 25%; animation-delay: 0.5s; width: 45px; height: 90px; }
+  @keyframes flameLick {
+    0% { transform: scaleY(0.6) scaleX(1); opacity: 0.3; }
+    50% { transform: scaleY(1.2) scaleX(0.8); opacity: 0.7; }
+    100% { transform: scaleY(0.8) scaleX(1.1); opacity: 0.4; }
+  }
+
+  /* Floating fire sparks */
+  .spark {
+    position: fixed; width: 3px; height: 3px; border-radius: 50%; pointer-events: none; z-index: 1;
+    animation: sparkFloat linear infinite;
+  }
+  @keyframes sparkFloat {
+    0% { opacity: 0; transform: translateY(0) translateX(0); }
+    10% { opacity: 1; }
+    90% { opacity: 0.6; }
+    100% { opacity: 0; transform: translateY(-80vh) translateX(var(--drift)); }
+  }
 
   .scanlines {
     position: fixed; inset: 0; z-index: 1; pointer-events: none;
@@ -56,7 +94,7 @@
 
   .container { position: relative; z-index: 2; max-width: 900px; margin: 0 auto; padding: 0 16px 60px; }
 
-  /* TOP NAV */
+  /* === TOP NAV === */
   .topnav {
     position: sticky; top: 0; z-index: 100;
     background: #0a0e1aee; backdrop-filter: blur(12px);
@@ -64,22 +102,22 @@
   }
   .topnav-inner { max-width: 900px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 56px; gap: 12px; }
   .topnav-left { display: flex; align-items: center; gap: 10px; min-width: 0; text-decoration: none; }
-  .topnav-logo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-  .topnav-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 14px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topnav-logo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid var(--border); }
+  .topnav-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 14px; color: var(--text-primary); white-space: nowrap; }
   .topnav-sub { font-size: 10px; color: var(--text-muted); letter-spacing: .08em; }
   .topnav-links { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .topnav-link {
     display: flex; align-items: center; gap: 5px; background: #0f172a;
     border: 1px solid var(--border); border-radius: 99px; padding: 5px 12px;
     text-decoration: none; font-size: 10px; color: var(--text-secondary);
-    font-family: 'JetBrains Mono', monospace; letter-spacing: .05em; transition: border-color .2s;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: .05em; transition: all .2s;
   }
   .topnav-link:hover { border-color: var(--fire-orange); color: var(--fire-orange); }
   .topnav-link.active { border-color: var(--fire-orange); color: var(--fire-orange); background: #ff3d0011; }
   @media (max-width: 500px) { .topnav-links .hide-mobile { display: none; } }
 
-  /* HEADER */
-  .header { text-align: center; padding: 40px 0 20px; }
+  /* === HEADER WITH WOLF === */
+  .header { text-align: center; padding: 40px 0 20px; position: relative; }
   .header-badge {
     display: inline-flex; align-items: center; gap: 8px;
     background: linear-gradient(135deg, #ff3d0022, #ff6d0011); border: 1px solid #ff3d0044;
@@ -93,12 +131,52 @@
     font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: clamp(32px,7vw,56px); line-height: 1.1;
     background: linear-gradient(135deg, var(--fire-red), var(--fire-orange), var(--fire-yellow));
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    text-transform: uppercase; letter-spacing: -.02em; margin-bottom: 12px; filter: drop-shadow(0 0 30px #ff3d0044);
+    text-transform: uppercase; letter-spacing: -.02em; margin-bottom: 12px;
+    filter: drop-shadow(0 0 30px #ff3d0044);
   }
   .header .sub { font-size: 13px; color: var(--text-secondary); max-width: 500px; margin: 0 auto; line-height: 1.6; }
   .header .sub strong { color: var(--fire-orange); }
 
-  /* COUNTDOWN */
+  /* Wolf mascot */
+  .wolf-mascot {
+    position: relative;
+    width: 180px; height: 180px; margin: 24px auto 0;
+    animation: wolfFloat 3s ease-in-out infinite;
+    filter: drop-shadow(0 0 30px #ff3d0044) drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+  }
+  .wolf-mascot img { width: 100%; height: 100%; object-fit: contain; }
+  .wolf-glow {
+    position: absolute; inset: -20px; border-radius: 50%;
+    background: radial-gradient(circle, #ff3d0022 0%, transparent 70%);
+    animation: wolfGlow 2s ease-in-out infinite alternate;
+  }
+  @keyframes wolfFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes wolfGlow {
+    0% { opacity: 0.3; transform: scale(0.9); }
+    100% { opacity: 0.7; transform: scale(1.1); }
+  }
+
+  /* Flame ring around wolf */
+  .wolf-flames {
+    position: absolute; inset: -10px; pointer-events: none;
+  }
+  .wolf-flame-particle {
+    position: absolute; width: 6px; height: 12px;
+    background: linear-gradient(to top, var(--fire-orange), transparent);
+    border-radius: 50% 50% 20% 20%;
+    animation: wolfFlameOrbit var(--dur) linear infinite;
+    opacity: 0.6;
+  }
+  @keyframes wolfFlameOrbit {
+    0% { transform: rotate(var(--start)) translateY(-80px) scaleY(1); opacity: 0.7; }
+    50% { transform: rotate(calc(var(--start) + 180deg)) translateY(-80px) scaleY(1.3); opacity: 0.4; }
+    100% { transform: rotate(calc(var(--start) + 360deg)) translateY(-80px) scaleY(1); opacity: 0.7; }
+  }
+
+  /* === COUNTDOWN === */
   .countdown-section { margin: 30px 0; text-align: center; }
   .countdown-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .2em; margin-bottom: 14px; }
   .countdown-grid { display: flex; justify-content: center; gap: 12px; }
@@ -110,7 +188,7 @@
   .countdown-box .num { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 28px; }
   .countdown-box .unit { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .15em; margin-top: 4px; }
 
-  /* PRICE CARD */
+  /* === PRICE CARD === */
   .price-card {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
     padding: 24px; margin: 24px 0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;
@@ -126,7 +204,7 @@
   .price-item .change.down { color: var(--danger); }
   @media (max-width: 500px) { .price-card { grid-template-columns: 1fr; gap: 14px; } }
 
-  /* LOTS */
+  /* === LOTS === */
   .lots-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; text-align: center; margin: 36px 0 8px; }
   .lots-subtitle { text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 24px; }
   .lots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 30px; }
@@ -146,7 +224,7 @@
   .lot-price { font-size: 14px; color: var(--accent-cyan); font-weight: 600; }
   .lot-price .usd { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
 
-  /* BID SECTION */
+  /* === BID SECTION === */
   .bid-section {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
     padding: 28px; position: relative; overflow: hidden;
@@ -190,14 +268,14 @@
   .btn-bid::after { content:''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, #ffffff22, transparent); transform: translateX(-100%); animation: shimmer 3s ease-in-out infinite; }
   @keyframes shimmer { 0% { transform: translateX(-100%); } 60%,100% { transform: translateX(100%); } }
 
-  /* TOAST */
+  /* === TOAST === */
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: #1e293b; border: 1px solid var(--border); border-radius: 12px; padding: 14px 24px; font-size: 13px; z-index: 1000; transition: transform .4s cubic-bezier(.16,1,.3,1); max-width: 90vw; text-align: center; }
   .toast.show { transform: translateX(-50%) translateY(0); }
   .toast.success { border-color: #00e67644; color: var(--success); }
   .toast.error { border-color: #ff174444; color: var(--danger); }
   .toast.info { border-color: #64ffda44; color: var(--accent-cyan); }
 
-  /* BIDS TABLE */
+  /* === BIDS TABLE === */
   .bids-section { margin-top: 30px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
   .bids-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   .bids-header h3 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; }
@@ -209,7 +287,7 @@
   .bids-table tr:hover td { background: #0f172a; }
   .bids-empty { text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px; }
 
-  /* RULES */
+  /* === RULES === */
   .rules-section { margin-top: 30px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
   .rules-section h3 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
   .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -217,7 +295,7 @@
   .rule-item { background: #0a0e1a; border: 1px solid #1a2744; border-radius: 10px; padding: 16px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
   .rule-item .num { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 18px; color: var(--fire-orange); margin-bottom: 6px; }
 
-  /* FOOTER */
+  /* === FOOTER === */
   .footer { text-align: center; margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); line-height: 2; }
   .footer a { color: var(--text-secondary); text-decoration: none; }
   .footer a:hover { color: var(--fire-orange); }
@@ -234,21 +312,28 @@
 <body>
 
 <div class="fire-bg" id="fireBg"></div>
+<!-- Flame licks at bottom -->
+<div class="flame-lick"></div>
+<div class="flame-lick"></div>
+<div class="flame-lick"></div>
+<div class="flame-lick"></div>
+<div class="flame-lick"></div>
+<div class="flame-lick"></div>
 <div class="scanlines"></div>
 <div class="toast" id="toast"></div>
 
 <nav class="topnav">
   <div class="topnav-inner">
-    <a href="/cronostreasury.github.io/" class="topnav-left">
-      <img src="/cronostreasury.github.io/Logo1.jpg" alt="CTR" class="topnav-logo">
+    <a href="/" class="topnav-left">
+      <img src="/Logo1.jpg" alt="CTR" class="topnav-logo" onerror="this.style.display='none'">
       <div>
         <div class="topnav-title">Cronos Treasury Reserve</div>
         <div class="topnav-sub">CTR · CRONOS EVM</div>
       </div>
     </a>
     <div class="topnav-links">
-      <a href="/cronostreasury.github.io/" class="topnav-link hide-mobile">Dashboard</a>
-      <a href="/cronostreasury.github.io/firesale/" class="topnav-link active">🔥 Firesale</a>
+      <a href="/" class="topnav-link hide-mobile">Dashboard</a>
+      <a href="/firesale/" class="topnav-link active">🔥 Firesale</a>
       <a href="https://x.com/CronosTreasury" target="_blank" class="topnav-link hide-mobile">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.741l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
       </a>
@@ -267,6 +352,13 @@
       Grab <strong>CTR</strong> at the exact live market price every Friday.
       Connect your wallet, choose your lot, place your bid.
       <br><strong>Limited supply. First come, first served.</strong>
+    </div>
+
+    <!-- Wolf Mascot -->
+    <div class="wolf-mascot">
+      <div class="wolf-glow"></div>
+      <img src="/firesale/wolf-fire.png" alt="CTR Wolf" onerror="this.parentElement.style.display='none'">
+      <div class="wolf-flames" id="wolfFlames"></div>
     </div>
   </div>
 
@@ -379,19 +471,61 @@ const LOTS = [
   { id:"whale",   tag:"whale",    label:"Whale",   amount:50_000_000, tagLabel:"Whale 🐋" },
 ];
 
-// ===================== STATE =====================
 let S = { wallet:null, croBalance:0, ctrPrice:0, ctrChange24h:0, ctrMcap:0, ctrVolume:0, croPrice:0, selectedLot:null, qty:1, bids:[] };
-
 const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 const fmtC=n=>n>=1e9?`${(n/1e9).toFixed(2)}B`:n>=1e6?`${(n/1e6).toFixed(2)}M`:n>=1e3?`${(n/1e3).toFixed(1)}K`:n.toFixed(0);
 const fmtP=p=>p<.0001?p.toFixed(8):p<.01?p.toFixed(6):p<1?p.toFixed(4):fmt(p);
 const trunc=a=>a?`${a.slice(0,6)}…${a.slice(-4)}`:'';
-
 function toast(msg,type='info'){const t=$('toast');t.textContent=msg;t.className=`toast show ${type}`;clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',4000);}
 
-// ===================== EMBERS =====================
-function spawnEmbers(){const bg=$('fireBg');for(let i=0;i<18;i++){const e=document.createElement('div');e.className='ember';e.style.left=Math.random()*100+'%';e.style.bottom='-10px';e.style.animationDuration=(4+Math.random()*6)+'s';e.style.animationDelay=Math.random()*5+'s';const sz=(2+Math.random()*4)+'px';e.style.width=sz;e.style.height=sz;bg.appendChild(e);}}
+// ===================== PARTICLES =====================
+function spawnEmbers(){
+  const bg=$('fireBg');
+  // Large embers
+  for(let i=0;i<20;i++){
+    const e=document.createElement('div');
+    e.className='ember';
+    e.style.left=Math.random()*100+'%';
+    e.style.bottom='-10px';
+    e.style.animationDuration=(3+Math.random()*7)+'s';
+    e.style.animationDelay=Math.random()*5+'s';
+    const sz=(2+Math.random()*5)+'px';
+    e.style.width=sz; e.style.height=sz;
+    const colors=['#ff3d00','#ff6d00','#ffab00','#ff8a00'];
+    e.style.background=colors[Math.floor(Math.random()*colors.length)];
+    bg.appendChild(e);
+  }
+  // Tiny sparks
+  for(let i=0;i<12;i++){
+    const s=document.createElement('div');
+    s.className='spark';
+    s.style.left=Math.random()*100+'%';
+    s.style.bottom='0';
+    s.style.setProperty('--drift',(Math.random()*80-40)+'px');
+    s.style.animationDuration=(5+Math.random()*8)+'s';
+    s.style.animationDelay=Math.random()*6+'s';
+    s.style.width=(1+Math.random()*2)+'px';
+    s.style.height=s.style.width;
+    s.style.background=Math.random()>.5?'#ff6d00':'#ffab00';
+    document.body.appendChild(s);
+  }
+}
+
+function spawnWolfFlames(){
+  const c=$('wolfFlames');
+  if(!c)return;
+  for(let i=0;i<8;i++){
+    const f=document.createElement('div');
+    f.className='wolf-flame-particle';
+    f.style.setProperty('--start',(i*45)+'deg');
+    f.style.setProperty('--dur',(3+Math.random()*2)+'s');
+    f.style.left='50%'; f.style.top='50%';
+    const colors=['#ff3d00','#ff6d00','#ffab00'];
+    f.style.background=`linear-gradient(to top, ${colors[i%3]}, transparent)`;
+    c.appendChild(f);
+  }
+}
 
 // ===================== COUNTDOWN =====================
 function getNextFriEnd(){const n=new Date(),d=n.getUTCDay();let df=(5-d+7)%7;if(df===0){const e=new Date(Date.UTC(n.getUTCFullYear(),n.getUTCMonth(),n.getUTCDate(),23,59,59));if(n<e)return e;df=7;}const t=new Date(n);t.setUTCDate(t.getUTCDate()+df);return new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate(),23,59,59));}
@@ -410,7 +544,7 @@ function changeQty(d){S.qty=Math.max(1,Math.min(10,S.qty+d));$('qtyDisplay').tex
 
 // ===================== SUMMARY =====================
 function updSummary(){const l=LOTS.find(x=>x.id===S.selectedLot);if(!l||S.ctrPrice===0){$('sumLot').textContent=l?l.label:'--';$('sumQty').textContent=S.qty;$('sumCtr').textContent='--';$('sumCro').textContent='--';$('totalCtr').textContent='--';updBtn();return;}const tc=l.amount*S.qty,usd=tc*S.ctrPrice,cro=S.croPrice>0?usd/S.croPrice:0;$('sumLot').textContent=`${l.label} (${fmtC(l.amount)})`;$('sumQty').textContent=S.qty;$('sumCtr').textContent=fmtC(tc);$('sumCro').textContent=cro>0?fmt(cro,2)+' CRO':'...';$('totalCtr').textContent=fmtC(tc);updBtn();}
-function updBtn(){const b=$('btnBid');if(!S.wallet){b.textContent='Connect Wallet to Bid';b.disabled=true;}else if(!S.selectedLot){b.textContent='Select a Lot First';b.disabled=true;}else{const l=LOTS.find(x=>x.id===S.selectedLot),tc=l.amount*S.qty,cro=S.croPrice>0?(tc*S.ctrPrice)/S.croPrice:0;b.textContent=cro>0?`🔥 Place Bid — ${fmt(cro,2)} CRO`:'🔥 Place Bid';b.disabled=false;}}
+function updBtn(){const b=$('btnBid');if(!S.wallet){b.textContent='Connect Wallet to Bid';b.disabled=true;}else if(!S.selectedLot){b.textContent='Select a Lot First';b.disabled=true;}else{const l=LOTS.find(x=>x.id===S.selectedLot),cro=S.croPrice>0?(l.amount*S.qty*S.ctrPrice)/S.croPrice:0;b.textContent=cro>0?`🔥 Place Bid — ${fmt(cro,2)} CRO`:'🔥 Place Bid';b.disabled=false;}}
 
 // ===================== WALLET =====================
 async function connectWallet(){if(!window.ethereum){toast('No wallet detected. Install MetaMask or Crypto.com DeFi Wallet.','error');return;}const btn=$('btnConnect');try{btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting...';const accs=await window.ethereum.request({method:'eth_requestAccounts'});if(!accs.length)throw new Error('No account');try{await window.ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:CRONOS_CHAIN_ID}]});}catch(e){if(e.code===4902)await window.ethereum.request({method:'wallet_addEthereumChain',params:[{chainId:CRONOS_CHAIN_ID,chainName:'Cronos',nativeCurrency:{name:'CRO',symbol:'CRO',decimals:18},rpcUrls:[CRONOS_RPC],blockExplorerUrls:['https://explorer.cronos.org/']}]});}S.wallet=accs[0];await fetchBal();renderWallet();updSummary();toast('Wallet connected on Cronos!','success');window.ethereum.on('accountsChanged',a=>{if(!a.length)disconnectWallet();else{S.wallet=a[0];fetchBal().then(()=>{renderWallet();updSummary();});}});window.ethereum.on('chainChanged',()=>{fetchBal().then(()=>renderWallet());});}catch(e){console.error(e);toast('Connection failed: '+(e.message||e),'error');}finally{btn.disabled=false;btn.textContent='Connect Wallet';}}
@@ -429,7 +563,7 @@ function tAgo(ts){const d=Date.now()-new Date(ts).getTime();if(d<6e4)return'just
 async function placeBid(){if(!S.wallet){toast('Connect your wallet first.','error');return;}if(!S.selectedLot){toast('Select a lot first.','error');return;}const l=LOTS.find(x=>x.id===S.selectedLot),tc=l.amount*S.qty,usd=tc*S.ctrPrice,need=S.croPrice>0?usd/S.croPrice:0;await fetchBal();renderWallet();if(S.croBalance<need){toast(`Insufficient CRO. Need ${fmt(need,2)} but have ${fmt(S.croBalance,2)}.`,'error');return;}const btn=$('btnBid');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Submitting Bid...';const bid={wallet:S.wallet,lotId:l.id,lotLabel:l.label,qty:S.qty,totalCtr:tc,ctrPrice:S.ctrPrice,croCost:need,croBalance:S.croBalance,timestamp:new Date().toISOString()};S.bids.push(bid);const ok=await saveBids();if(ok){toast(`🔥 Bid placed! ${fmtC(tc)} CTR for ${fmt(need,2)} CRO`,'success');renderBids();}else{S.bids.pop();}updSummary();}
 
 // ===================== INIT =====================
-function init(){spawnEmbers();updCD();setInterval(updCD,1000);fetchPrice();setInterval(fetchPrice,30000);loadBids();setInterval(loadBids,15000);renderLots();updSummary();if(window.ethereum?.selectedAddress){S.wallet=window.ethereum.selectedAddress;fetchBal().then(()=>{renderWallet();updSummary();});}}
+function init(){spawnEmbers();spawnWolfFlames();updCD();setInterval(updCD,1000);fetchPrice();setInterval(fetchPrice,30000);loadBids();setInterval(loadBids,15000);renderLots();updSummary();if(window.ethereum?.selectedAddress){S.wallet=window.ethereum.selectedAddress;fetchBal().then(()=>{renderWallet();updSummary();});}}
 document.addEventListener('DOMContentLoaded',init);
 </script>
 </body>
