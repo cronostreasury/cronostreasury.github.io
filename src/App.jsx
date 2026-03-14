@@ -460,6 +460,10 @@ export default function CTRDashboard() {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff7c1f"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
               <span style={{ fontSize: 10, color: "#ff7c1f", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>DeBank</span>
             </a>
+            <a href="https://cronostreasury.github.io/CTR-Governance/" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
+              <span style={{ fontSize: 12 }}>🗳️</span>
+              <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>Governance</span>
+            </a>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 13, color: "#64ffda", fontFamily: "'DM Mono',monospace", fontWeight: 600 }}>
                 {livePrice !== null ? `$${fmtPrice(livePrice)}` : "Loading..."}
