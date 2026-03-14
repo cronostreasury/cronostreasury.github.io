@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CTR Firesale Friday 🔥 | Cronos Treasury Reserve</title>
-<meta name="description" content="Weekly CTR token sale. Connect your wallet, place your bid, and buy CTR at market price with zero tax. Grab CTR before it's gone.">
+<meta name="description" content="Weekly CTR token sale at market price. Connect your wallet, place your bid, grab CTR before it's gone.">
 <link rel="icon" href="/Logo1.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
@@ -176,6 +176,18 @@
   .countdown-box .num { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 28px; }
   .countdown-box .unit { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .15em; margin-top: 4px; }
 
+  .live-banner {
+    font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: clamp(16px, 4vw, 24px);
+    background: linear-gradient(135deg, var(--fire-red), var(--fire-orange), var(--fire-yellow));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    padding: 18px 0; letter-spacing: .05em;
+    animation: livePulse 1.5s ease-in-out infinite;
+  }
+  @keyframes livePulse {
+    0%, 100% { filter: drop-shadow(0 0 10px #ff3d0033); }
+    50% { filter: drop-shadow(0 0 25px #ff3d0066); }
+  }
+
   /* === PRICE CARD === */
   .price-card {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
@@ -344,19 +356,19 @@
 
     <h1>Firesale<br>Friday</h1>
     <div class="sub">
-      Grab <strong>CTR</strong> at the exact live market price every Friday.
-      Connect your wallet, choose your lot, place your bid.
-      <br><strong>Limited supply. First come, first served.</strong>
+      Weekly <strong>CTR</strong> token sale. Connect your wallet, place your bid,
+      and buy CTR at market price with <strong>zero tax</strong>.
     </div>
   </div>
 
   <div class="countdown-section">
-    <div class="countdown-label">Next Firesale Ends In</div>
-    <div class="countdown-grid">
+    <div class="countdown-label" id="cdLabel">Next Firesale Starts In</div>
+    <div class="countdown-grid" id="cdGrid">
       <div class="countdown-box"><div class="num" id="cd-h">--</div><div class="unit">Hours</div></div>
       <div class="countdown-box"><div class="num" id="cd-m">--</div><div class="unit">Minutes</div></div>
       <div class="countdown-box"><div class="num" id="cd-s">--</div><div class="unit">Seconds</div></div>
     </div>
+    <div class="live-banner" id="liveBanner" style="display:none">🔥 FIRESALE IS LIVE — BID NOW! 🔥</div>
   </div>
 
   <div class="price-card">
@@ -503,8 +515,34 @@ function spawnEmbers(){
 // Wolf is now a CSS background element — no JS needed
 
 // ===================== COUNTDOWN =====================
-function getNextFriEnd(){const n=new Date(),d=n.getUTCDay();let df=(5-d+7)%7;if(df===0){const e=new Date(Date.UTC(n.getUTCFullYear(),n.getUTCMonth(),n.getUTCDate(),23,59,59));if(n<e)return e;df=7;}const t=new Date(n);t.setUTCDate(t.getUTCDate()+df);return new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate(),23,59,59));}
-function updCD(){const d=Math.max(0,getNextFriEnd()-Date.now());$('cd-h').textContent=String(Math.floor(d/36e5)).padStart(2,'0');$('cd-m').textContent=String(Math.floor((d%36e5)/6e4)).padStart(2,'0');$('cd-s').textContent=String(Math.floor((d%6e4)/1e3)).padStart(2,'0');}
+function isFridayUTC() {
+  return new Date().getUTCDay() === 5;
+}
+function getNextFridayStart() {
+  const n = new Date();
+  const day = n.getUTCDay();
+  let daysUntilFri = (5 - day + 7) % 7;
+  if (daysUntilFri === 0) daysUntilFri = 7; // If Friday, count to NEXT Friday
+  const t = new Date(n);
+  t.setUTCDate(t.getUTCDate() + daysUntilFri);
+  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 0, 0, 0));
+}
+function updCD() {
+  if (isFridayUTC()) {
+    // It's Friday — show LIVE banner, hide countdown
+    $('cdLabel').style.display = 'none';
+    $('cdGrid').style.display = 'none';
+    $('liveBanner').style.display = 'block';
+  } else {
+    $('cdLabel').style.display = 'block';
+    $('cdGrid').style.display = 'flex';
+    $('liveBanner').style.display = 'none';
+    const d = Math.max(0, getNextFridayStart() - Date.now());
+    $('cd-h').textContent = String(Math.floor(d / 36e5)).padStart(2, '0');
+    $('cd-m').textContent = String(Math.floor((d % 36e5) / 6e4)).padStart(2, '0');
+    $('cd-s').textContent = String(Math.floor((d % 6e4) / 1e3)).padStart(2, '0');
+  }
+}
 
 // ===================== PRICE =====================
 async function fetchPrice(){try{const r=await fetch(DEX_PAIR),d=await r.json(),p=d.pair;if(!p)return;S.ctrPrice=parseFloat(p.priceUsd)||0;S.ctrChange24h=parseFloat(p.priceChange?.h24)||0;S.ctrMcap=parseFloat(p.fdv)||0;S.ctrVolume=parseFloat(p.volume?.h24)||0;const pn=parseFloat(p.priceNative)||0;if(pn>0&&S.ctrPrice>0)S.croPrice=S.ctrPrice/pn;renderPrice();renderLots();updSummary();}catch(e){console.error(e);}}
