@@ -117,7 +117,7 @@
   @media (max-width: 500px) { .topnav-links .hide-mobile { display: none; } }
 
   /* === HEADER WITH WOLF === */
-  .header { text-align: center; padding: 40px 0 20px; position: relative; overflow: hidden; }
+  .header { text-align: center; padding: 40px 0 20px; }
   .header-badge {
     display: inline-flex; align-items: center; gap: 8px;
     background: linear-gradient(135deg, #ff3d0022, #ff6d0011); border: 1px solid #ff3d0044;
@@ -131,41 +131,37 @@
     font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: clamp(32px,7vw,56px); line-height: 1.1;
     background: linear-gradient(135deg, var(--fire-red), var(--fire-orange), var(--fire-yellow));
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    text-transform: uppercase; letter-spacing: -.02em; margin-bottom: 12px;
+    text-transform: uppercase; letter-spacing: -.02em; margin-top: -8px; margin-bottom: 12px;
     filter: drop-shadow(0 0 30px #ff3d0044);
   }
   .header .sub { font-size: 13px; color: var(--text-secondary); max-width: 500px; margin: 0 auto; line-height: 1.6; }
   .header .sub strong { color: var(--fire-orange); }
 
-  /* Wolf mascot — decorative accent, right side */
+  /* Wolf mascot — centered above title, flame replaces emoji */
   .wolf-mascot {
-    position: absolute;
-    right: -40px; top: 50%;
-    transform: translateY(-55%);
-    width: 220px; height: 220px;
+    width: 140px; height: 140px;
+    margin: 0 auto 0;
     pointer-events: none;
-    z-index: 0;
     animation: wolfFloat 4s ease-in-out infinite;
-    opacity: 0.25;
-    filter: drop-shadow(0 0 25px #ff3d0055);
+    filter: drop-shadow(0 0 20px #ff3d0055) drop-shadow(0 5px 15px rgba(0,0,0,0.4));
+    position: relative;
   }
   .wolf-mascot img { width: 100%; height: 100%; object-fit: contain; }
   .wolf-glow {
-    position: absolute; inset: -30px; border-radius: 50%;
-    background: radial-gradient(circle, #ff3d0018 0%, transparent 70%);
+    position: absolute; inset: -20px; border-radius: 50%;
+    background: radial-gradient(circle, #ff3d0020 0%, transparent 70%);
     animation: wolfGlow 3s ease-in-out infinite alternate;
   }
-  .header > *:not(.wolf-mascot) { position: relative; z-index: 1; }
   @keyframes wolfFloat {
-    0%, 100% { transform: translateY(-55%) scale(1); }
-    50% { transform: translateY(-57%) scale(1.03); }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
   }
   @keyframes wolfGlow {
     0% { opacity: 0.3; transform: scale(0.95); }
     100% { opacity: 0.6; transform: scale(1.1); }
   }
-  @media (max-width: 700px) {
-    .wolf-mascot { width: 150px; height: 150px; right: -20px; opacity: 0.15; }
+  @media (max-width: 500px) {
+    .wolf-mascot { width: 110px; height: 110px; }
   }
 
   /* === COUNTDOWN === */
@@ -338,14 +334,15 @@
 
 <div class="container">
   <div class="header">
-    <!-- Wolf as transparent background -->
+    <div class="header-badge"><span class="dot"></span> Firesale Active</div>
+
+    <!-- Wolf mascot — his flame IS the fire icon -->
     <div class="wolf-mascot">
       <div class="wolf-glow"></div>
       <img src="/firesale/wolf-fire.png" alt="" onerror="this.parentElement.style.display='none'">
     </div>
 
-    <div class="header-badge"><span class="dot"></span> Firesale Active</div>
-    <h1>🔥 Firesale<br>Friday</h1>
+    <h1>Firesale<br>Friday</h1>
     <div class="sub">
       Grab <strong>CTR</strong> at the exact live market price every Friday.
       Connect your wallet, choose your lot, place your bid.
