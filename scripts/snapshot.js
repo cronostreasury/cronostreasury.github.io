@@ -55,6 +55,8 @@ async function getPrices() {
   return priceMap;
 }
 
+const STAKED_PACK_AMOUNT = 1393025; // manually tracked – update when staking changes
+
 async function main() {
   console.log("📸 Taking treasury snapshot...");
 
@@ -71,6 +73,13 @@ async function main() {
     holdings[t.symbol] = { amount: balances[i], price, value };
     tvl += value;
   });
+
+  // Add staked PACK (Wolfswap Vault – not in wallet)
+  const packPrice = prices["PACK"] || 0;
+  const stakedPackValue = STAKED_PACK_AMOUNT * packPrice;
+  holdings["PACK_STAKED"] = { amount: STAKED_PACK_AMOUNT, price: packPrice, value: stakedPackValue };
+  tvl += stakedPackValue;
+  console.log(`🔒 Staked PACK: ${STAKED_PACK_AMOUNT} × $${packPrice} = $${stakedPackValue.toFixed(2)}`);
 
   const snapshot = {
     date: new Date().toISOString().split("T")[0],
