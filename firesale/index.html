@@ -223,6 +223,9 @@
   .lot-token { font-size: 11px; color: var(--text-muted); margin-bottom: 14px; }
   .lot-price { font-size: 14px; color: var(--accent-cyan); font-weight: 600; }
   .lot-price .usd { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
+  .lot-req { font-size: 10px; color: var(--text-muted); margin-top: 10px; padding-top: 10px; border-top: 1px solid #1a274433; }
+  .lot-card.locked { opacity: 0.45; cursor: not-allowed; }
+  .lot-card.locked:hover { transform: none; box-shadow: none; border-color: var(--border); }
 
   /* === BID SECTION === */
   .bid-section {
@@ -356,8 +359,8 @@
 
     <h1>Firesale<br>Friday</h1>
     <div class="sub">
-      Weekly <strong>CTR</strong> token sale. Connect your wallet, place your bid,
-      and buy CTR at market price with <strong>zero tax</strong>.
+      Weekly <strong>CTR</strong> token sale — exclusively for holders.
+      Connect your wallet, place your bid, and buy CTR at market price with <strong>zero tax</strong>.
     </div>
   </div>
 
@@ -441,8 +444,8 @@
     <h3>📜 How It Works</h3>
     <div class="rules-grid">
       <div class="rule-item"><div class="num">01</div>Connect your Cronos wallet (MetaMask, Crypto.com DeFi Wallet, etc.)</div>
-      <div class="rule-item"><div class="num">02</div>Select a lot size and quantity. Price is the live DexScreener market rate.</div>
-      <div class="rule-item"><div class="num">03</div>Place your bid. Your CRO balance is verified on-chain (no tx needed yet).</div>
+      <div class="rule-item"><div class="num">02</div>Only CTR holders can bid. Each lot tier requires a minimum CTR balance in your wallet.</div>
+      <div class="rule-item"><div class="num">03</div>Select your lot and place your bid. Price is the live DexScreener rate — zero tax.</div>
       <div class="rule-item"><div class="num">04</div>Winning bids are settled manually. CTR is sent to your wallet after the sale closes.</div>
     </div>
   </div>
@@ -465,13 +468,16 @@ const CRONOS_RPC = "https://evm.cronos.org";
 const DEX_PAIR = "https://api.dexscreener.com/latest/dex/pairs/cronos/0xf118aa245b0627b4752607620d0048b492a5f4fb";
 
 const LOTS = [
-  { id:"starter", tag:"standard", label:"Starter", amount:5_000_000, tagLabel:"Standard" },
-  { id:"medium",  tag:"standard", label:"Medium",  amount:10_000_000, tagLabel:"Standard" },
-  { id:"premium", tag:"premium",  label:"Premium", amount:25_000_000, tagLabel:"Premium" },
-  { id:"whale",   tag:"whale",    label:"Whale",   amount:50_000_000, tagLabel:"Whale 🐋" },
+  { id:"enjoyer", tag:"standard", label:"CTR Enjoyer", amount:500_000, tagLabel:"Enjoyer 🦧", minHold:1_000_000 },
+  { id:"whale",   tag:"standard", label:"CTR Whale",   amount:1_000_000, tagLabel:"Whale 🐋", minHold:10_000_000 },
+  { id:"titan",   tag:"premium",  label:"CTR Titan",   amount:5_000_000, tagLabel:"Titan 🐉", minHold:20_000_000 },
+  { id:"legend",  tag:"whale",    label:"CTR Legend",   amount:10_000_000, tagLabel:"Legend 🏆", minHold:30_000_000 },
 ];
 
-let S = { wallet:null, croBalance:0, ctrPrice:0, ctrChange24h:0, ctrMcap:0, ctrVolume:0, croPrice:0, selectedLot:null, qty:1, bids:[] };
+const CTR_TOKEN = "0xF3672F0cF2E45B28AC4a1D50FD8aC2eB555c21FC";
+const CTR_DECIMALS = 18;
+
+let S = { wallet:null, croBalance:0, ctrBalance:0, ctrPrice:0, ctrChange24h:0, ctrMcap:0, ctrVolume:0, croPrice:0, selectedLot:null, qty:1, bids:[] };
 const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 const fmtC=n=>n>=1e9?`${(n/1e9).toFixed(2)}B`:n>=1e6?`${(n/1e6).toFixed(2)}M`:n>=1e3?`${(n/1e3).toFixed(1)}K`:n.toFixed(0);
@@ -549,7 +555,7 @@ async function fetchPrice(){try{const r=await fetch(DEX_PAIR),d=await r.json(),p
 function renderPrice(){$('ctrPrice').textContent=S.ctrPrice>0?`$${fmtP(S.ctrPrice)}`:'...';const c=S.ctrChange24h,el=$('ctrChange');el.textContent=c!==0?`${c>0?'▲':'▼'} ${Math.abs(c).toFixed(2)}% (24h)`:'';el.className=`change ${c>=0?'up':'down'}`;$('ctrMcap').textContent=S.ctrMcap>0?`$${fmtC(S.ctrMcap)}`:'...';$('ctrVol').textContent=S.ctrVolume>0?`$${fmtC(S.ctrVolume)}`:'...';}
 
 // ===================== LOTS =====================
-function renderLots(){const g=$('lotsGrid');g.innerHTML='';LOTS.forEach(l=>{const usd=l.amount*S.ctrPrice,cro=S.croPrice>0?usd/S.croPrice:0;const c=document.createElement('div');c.className=`lot-card${S.selectedLot===l.id?' selected':''}`;c.onclick=()=>selLot(l.id);c.innerHTML=`<div class="lot-tag ${l.tag}">${l.tagLabel}</div><div class="lot-amount">${fmtC(l.amount)}</div><div class="lot-token">CTR Tokens</div><div class="lot-price">${cro>0?fmtC(cro)+' CRO':'...'}<span class="usd">(≈ $${usd>0?fmtC(usd):'...'})</span></div>`;g.appendChild(c);});}
+function renderLots(){const g=$('lotsGrid');g.innerHTML='';LOTS.forEach(l=>{const usd=l.amount*S.ctrPrice,cro=S.croPrice>0?usd/S.croPrice:0;const isUnlocked=!S.wallet||S.ctrBalance>=l.minHold;const c=document.createElement('div');c.className=`lot-card${S.selectedLot===l.id?' selected':''}${!isUnlocked&&S.wallet?' locked':''}`;c.onclick=()=>{if(!S.wallet){toast('Connect your wallet first.','error');return;}if(!isUnlocked){toast(`You need at least ${fmtC(l.minHold)} CTR to unlock this lot. You hold ${fmtC(S.ctrBalance)}.`,'error');return;}selLot(l.id);};c.innerHTML=`<div class="lot-tag ${l.tag}">${l.tagLabel}</div><div class="lot-amount">${fmtC(l.amount)}</div><div class="lot-token">CTR Tokens</div><div class="lot-price">${cro>0?fmtC(cro)+' CRO':'...'}<span class="usd">(≈ $${usd>0?fmtC(usd):'...'})</span></div><div class="lot-req">${S.wallet&&!isUnlocked?'🔒':S.wallet?'🔓':''} Hold ${fmtC(l.minHold)} CTR</div>`;g.appendChild(c);});}
 function selLot(id){S.selectedLot=id;S.qty=1;$('qtyDisplay').textContent='1';renderLots();updSummary();chkBal();}
 
 // ===================== QTY =====================
@@ -562,8 +568,10 @@ function updBtn(){const b=$('btnBid');if(!S.wallet){b.textContent='Connect Walle
 // ===================== WALLET =====================
 async function connectWallet(){if(!window.ethereum){toast('No wallet detected. Install MetaMask or Crypto.com DeFi Wallet.','error');return;}const btn=$('btnConnect');try{btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting...';const accs=await window.ethereum.request({method:'eth_requestAccounts'});if(!accs.length)throw new Error('No account');try{await window.ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:CRONOS_CHAIN_ID}]});}catch(e){if(e.code===4902)await window.ethereum.request({method:'wallet_addEthereumChain',params:[{chainId:CRONOS_CHAIN_ID,chainName:'Cronos',nativeCurrency:{name:'CRO',symbol:'CRO',decimals:18},rpcUrls:[CRONOS_RPC],blockExplorerUrls:['https://explorer.cronos.org/']}]});}S.wallet=accs[0];await fetchBal();renderWallet();updSummary();toast('Wallet connected on Cronos!','success');window.ethereum.on('accountsChanged',a=>{if(!a.length)disconnectWallet();else{S.wallet=a[0];fetchBal().then(()=>{renderWallet();updSummary();});}});window.ethereum.on('chainChanged',()=>{fetchBal().then(()=>renderWallet());});}catch(e){console.error(e);toast('Connection failed: '+(e.message||e),'error');}finally{btn.disabled=false;btn.textContent='Connect Wallet';}}
 function disconnectWallet(){S.wallet=null;S.croBalance=0;renderWallet();updSummary();toast('Wallet disconnected','info');}
-async function fetchBal(){if(!S.wallet)return;try{const b=await window.ethereum.request({method:'eth_getBalance',params:[S.wallet,'latest']});S.croBalance=parseInt(b,16)/1e18;}catch(e){console.error(e);}}
-function renderWallet(){const c=!!S.wallet;$('btnConnect').style.display=c?'none':'inline-flex';$('btnDisconnect').style.display=c?'inline-flex':'none';$('walletInfo').style.display=c?'flex':'none';if(c){$('walletAddr').textContent=trunc(S.wallet);$('walletBal').textContent=fmt(S.croBalance,2)+' CRO';}chkBal();}
+async function fetchBal(){if(!S.wallet)return;try{const b=await window.ethereum.request({method:'eth_getBalance',params:[S.wallet,'latest']});S.croBalance=parseInt(b,16)/1e18;}catch(e){console.error(e);}
+  // Fetch CTR token balance via RPC
+  try{const data='0x70a08231'+S.wallet.slice(2).padStart(64,'0');const r=await window.ethereum.request({method:'eth_call',params:[{to:CTR_TOKEN,data},'latest']});S.ctrBalance=parseInt(r,16)/Math.pow(10,CTR_DECIMALS);}catch(e){console.error('CTR balance error:',e);S.ctrBalance=0;}}
+function renderWallet(){const c=!!S.wallet;$('btnConnect').style.display=c?'none':'inline-flex';$('btnDisconnect').style.display=c?'inline-flex':'none';$('walletInfo').style.display=c?'flex':'none';if(c){$('walletAddr').textContent=trunc(S.wallet);$('walletBal').textContent=fmt(S.croBalance,2)+' CRO · '+fmtC(S.ctrBalance)+' CTR';}chkBal();renderLots();}
 function chkBal(){const w=$('warningBox');if(!S.wallet||!S.selectedLot||S.ctrPrice===0||S.croPrice===0){w.classList.remove('show');return;}const l=LOTS.find(x=>x.id===S.selectedLot),need=(l.amount*S.qty*S.ctrPrice)/S.croPrice;w.classList.toggle('show',S.croBalance<need);}
 
 // ===================== JSONBIN =====================
@@ -573,7 +581,7 @@ function renderBids(){$('bidsCount').textContent=S.bids.length;if(S.bids.length=
 function tAgo(ts){const d=Date.now()-new Date(ts).getTime();if(d<6e4)return'just now';if(d<36e5)return Math.floor(d/6e4)+'m ago';if(d<864e5)return Math.floor(d/36e5)+'h ago';return Math.floor(d/864e5)+'d ago';}
 
 // ===================== PLACE BID =====================
-async function placeBid(){if(!S.wallet){toast('Connect your wallet first.','error');return;}if(!S.selectedLot){toast('Select a lot first.','error');return;}const l=LOTS.find(x=>x.id===S.selectedLot),tc=l.amount*S.qty,usd=tc*S.ctrPrice,need=S.croPrice>0?usd/S.croPrice:0;await fetchBal();renderWallet();if(S.croBalance<need){toast(`Insufficient CRO. Need ${fmt(need,2)} but have ${fmt(S.croBalance,2)}.`,'error');return;}const btn=$('btnBid');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Submitting Bid...';const bid={wallet:S.wallet,lotId:l.id,lotLabel:l.label,qty:S.qty,totalCtr:tc,ctrPrice:S.ctrPrice,croCost:need,croBalance:S.croBalance,timestamp:new Date().toISOString()};S.bids.push(bid);const ok=await saveBids();if(ok){toast(`🔥 Bid placed! ${fmtC(tc)} CTR for ${fmt(need,2)} CRO`,'success');renderBids();}else{S.bids.pop();}updSummary();}
+async function placeBid(){if(!S.wallet){toast('Connect your wallet first.','error');return;}if(!S.selectedLot){toast('Select a lot first.','error');return;}const l=LOTS.find(x=>x.id===S.selectedLot),tc=l.amount*S.qty,usd=tc*S.ctrPrice,need=S.croPrice>0?usd/S.croPrice:0;await fetchBal();renderWallet();if(S.ctrBalance<l.minHold){toast(`You need at least ${fmtC(l.minHold)} CTR to bid on this lot.`,'error');S.selectedLot=null;renderLots();updSummary();return;}if(S.croBalance<need){toast(`Insufficient CRO. Need ${fmt(need,2)} but have ${fmt(S.croBalance,2)}.`,'error');return;}const btn=$('btnBid');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Submitting Bid...';const bid={wallet:S.wallet,lotId:l.id,lotLabel:l.label,qty:S.qty,totalCtr:tc,ctrPrice:S.ctrPrice,croCost:need,croBalance:S.croBalance,timestamp:new Date().toISOString()};S.bids.push(bid);const ok=await saveBids();if(ok){toast(`🔥 Bid placed! ${fmtC(tc)} CTR for ${fmt(need,2)} CRO`,'success');renderBids();}else{S.bids.pop();}updSummary();}
 
 // ===================== INIT =====================
 function init(){spawnEmbers();updCD();setInterval(updCD,1000);fetchPrice();setInterval(fetchPrice,30000);loadBids();setInterval(loadBids,15000);renderLots();updSummary();if(window.ethereum?.selectedAddress){S.wallet=window.ethereum.selectedAddress;fetchBal().then(()=>{renderWallet();updSummary();});}}
