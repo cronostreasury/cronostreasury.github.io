@@ -513,9 +513,9 @@ const CTR_DECIMALS = 18;
 
 let S = { wallet:null, croBalance:0, ctrBalance:0, ctrPrice:0, ctrChange24h:0, ctrMcap:0, ctrVolume:0, croPrice:0, selectedLot:null, yourBid:0, bids:[] };
 const $=id=>document.getElementById(id);
-const fmt=(n,d=2)=>n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
-const fmtC=n=>n>=1e9?`${(n/1e9).toFixed(2)}B`:n>=1e6?`${(n/1e6).toFixed(2)}M`:n>=1e3?`${(n/1e3).toFixed(1)}K`:n.toFixed(0);
-const fmtP=p=>p<.0001?p.toFixed(8):p<.01?p.toFixed(6):p<1?p.toFixed(4):fmt(p);
+const fmt=(n,d=2)=>{if(n===undefined||n===null||isNaN(n))return'0';return n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});};
+const fmtC=n=>{if(n===undefined||n===null||isNaN(n))return'0';return n>=1e9?`${(n/1e9).toFixed(2)}B`:n>=1e6?`${(n/1e6).toFixed(2)}M`:n>=1e3?`${(n/1e3).toFixed(1)}K`:n.toFixed(0);};
+const fmtP=p=>{if(p===undefined||p===null||isNaN(p))return'0';return p<.0001?p.toFixed(8):p<.01?p.toFixed(6):p<1?p.toFixed(4):fmt(p);};
 const trunc=a=>a?`${a.slice(0,6)}…${a.slice(-4)}`:'';
 function toast(msg,type='info'){const t=$('toast');t.textContent=msg;t.className=`toast show ${type}`;clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',4000);}
 
@@ -601,19 +601,25 @@ const BID_STEP = 50; // CRO increment
 function getHighBid(lotId) {
   const lotBids = S.bids.filter(b => b.lotId === lotId);
   if (lotBids.length === 0) return null;
-  return lotBids.reduce((max, b) => b.croBid > max.croBid ? b : max, lotBids[0]);
+  return lotBids.reduce((max, b) => {
+    const bBid = b.croBid || b.croCost || 0;
+    const maxBid = max.croBid || max.croCost || 0;
+    return bBid > maxBid ? b : max;
+  }, lotBids[0]);
 }
 
-// Get minimum bid for a lot (starting price or highest + 50)
+function getBidAmount(b) {
+  return b.croBid || b.croCost || 0;
+}
+
 function getMinBid(lotId) {
   const high = getHighBid(lotId);
   if (!high) {
-    // Starting price = market price in CRO
     const lot = LOTS.find(l => l.id === lotId);
     const usd = lot.amount * S.ctrPrice;
     return S.croPrice > 0 ? Math.ceil(usd / S.croPrice) : 0;
   }
-  return high.croBid + BID_STEP;
+  return getBidAmount(high) + BID_STEP;
 }
 
 // ===================== LOTS =====================
@@ -632,7 +638,7 @@ function renderLots(){
       selLot(l.id);
     };
     const highBidHtml = high
-      ? `<div style="font-size:11px;color:var(--accent-cyan);margin-top:6px">⚡ High: ${fmt(high.croBid,0)} CRO by ${trunc(high.wallet)}</div>`
+      ? `<div style="font-size:11px;color:var(--accent-cyan);margin-top:6px">⚡ High: ${fmt(getBidAmount(high),0)} CRO by ${trunc(high.wallet)}</div>`
       : `<div style="font-size:11px;color:var(--text-muted);margin-top:6px">No bids yet</div>`;
     c.innerHTML=`<div class="lot-tag ${l.tag}">${l.tagLabel}</div><div class="lot-amount">${fmtC(l.amount)}</div><div class="lot-token">CTR Tokens</div><div class="lot-price">${cro>0?fmtC(cro)+' CRO':'...'}<span class="usd">(≈ $${usd>0?fmtC(usd):'...'})</span></div>${highBidHtml}<div class="lot-req">${S.wallet&&!isUnlocked?'🔒':S.wallet?'🔓':''} Hold ${fmtC(l.minHold)} CTR</div>`;
     g.appendChild(c);
@@ -663,7 +669,7 @@ function updAuction(){
   const minBid=getMinBid(l.id);
 
   if(high){
-    $('auctionHighBid').textContent=fmt(high.croBid,0)+' CRO';
+    $('auctionHighBid').textContent=fmt(getBidAmount(high),0)+' CRO';
     $('auctionHighBidder').textContent='by '+trunc(high.wallet);
   } else {
     $('auctionHighBid').textContent='No bids yet';
@@ -722,7 +728,7 @@ function renderBids(){
   $('bidsTbody').innerHTML=[...S.bids].reverse().slice(0,30).map(b=>{
     const lot=LOTS.find(l=>l.id===b.lotId);
     const isHigh=getHighBid(b.lotId)?.timestamp===b.timestamp&&getHighBid(b.lotId)?.wallet===b.wallet;
-    return `<tr style="${isHigh?'background:#ff3d0008':''}"><td>${lot?lot.label:b.lotId}</td><td style="color:var(--accent-cyan)">${trunc(b.wallet)}${isHigh?' 👑':''}</td><td style="color:var(--fire-orange);font-weight:600">${fmt(b.croBid,0)} CRO</td><td>${fmtC(lot?lot.amount:0)} CTR</td><td style="color:var(--text-muted)">${tAgo(b.timestamp)}</td></tr>`;
+    return `<tr style="${isHigh?'background:#ff3d0008':''}"><td>${lot?lot.label:b.lotId}</td><td style="color:var(--accent-cyan)">${trunc(b.wallet)}${isHigh?' 👑':''}</td><td style="color:var(--fire-orange);font-weight:600">${fmt(getBidAmount(b),0)} CRO</td><td>${fmtC(lot?lot.amount:0)} CTR</td><td style="color:var(--text-muted)">${tAgo(b.timestamp)}</td></tr>`;
   }).join('');
 }
 function tAgo(ts){const d=Date.now()-new Date(ts).getTime();if(d<6e4)return'just now';if(d<36e5)return Math.floor(d/6e4)+'m ago';if(d<864e5)return Math.floor(d/36e5)+'h ago';return Math.floor(d/864e5)+'d ago';}
