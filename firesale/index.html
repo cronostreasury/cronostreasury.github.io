@@ -673,22 +673,15 @@ function updAuction(){
     $('auctionHighBid').textContent='No bids yet';
     $('auctionHighBidder').textContent='Be the first!';
   }
-  $('auctionMinBid').textContent=fmt(minBid,0)+' CRO';
+  $('auctionMinBid').textContent=minBid>0?fmt(minBid,0)+' CRO':'...';
 
-  // Ensure yourBid >= minBid
   if(!S.yourBid||S.yourBid<minBid) S.yourBid=minBid;
-  $('yourBidDisplay').textContent=fmt(S.yourBid,0)+' CRO';
+  $('yourBidDisplay').textContent=S.yourBid>0?fmt(S.yourBid,0)+' CRO':'...';
+  $('bidCtrAmount').textContent=S.yourBid>0?`≈ ${fmtC(l.amount)} CTR for ${fmt(S.yourBid,0)} CRO`:'';
 
-  // Show equivalent CTR
-  if(S.croPrice>0){
-    const ctrEquiv=S.yourBid*S.croPrice/S.ctrPrice;
-    $('bidCtrAmount').textContent=`≈ ${fmtC(l.amount)} CTR for ${fmt(S.yourBid,0)} CRO`;
-  }
-
-  // Summary
   $('sumLot').textContent=l.label+' ('+fmtC(l.amount)+' CTR)';
   $('sumCtr').textContent=fmtC(l.amount);
-  $('sumCro').textContent=fmt(S.yourBid,0)+' CRO';
+  $('sumCro').textContent=S.yourBid>0?fmt(S.yourBid,0)+' CRO':'...';
   $('sumHold').textContent=fmtC(l.minHold)+' CTR';
 
   updBtn();
@@ -707,8 +700,9 @@ function updBtn(){
   if(!S.wallet){b.textContent='Connect Wallet to Bid';b.disabled=true;}
   else if(!S.selectedLot){b.textContent='Select a Lot First';b.disabled=true;}
   else{
-    b.textContent=`🔥 Place Bid — ${fmt(S.yourBid||0,0)} CRO`;
-    b.disabled=false;
+    const bid=S.yourBid||0;
+    b.textContent=bid>0?`🔥 Place Bid — ${fmt(bid,0)} CRO`:'🔥 Place Bid';
+    b.disabled=bid<=0;
   }
 }
 
