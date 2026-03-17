@@ -310,6 +310,22 @@
   @keyframes liveRing { 0% { transform:scale(.8); opacity:1; } 100% { transform:scale(1.8); opacity:0; } }
   .warning-box { background: #ff174412; border: 1px solid #ff174433; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: var(--danger); margin-bottom: 16px; display: none; }
   .warning-box.show { display: block; }
+
+  /* === AUCTION === */
+  .auction-info { margin-bottom: 20px; }
+  .auction-lot-name { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; margin-bottom: 14px; color: var(--fire-orange); }
+  .auction-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .auction-stat { background: #0a0e1a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+  .auction-stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 6px; }
+  .auction-stat-value { font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 18px; color: var(--accent-cyan); }
+  .auction-stat-value.fire { color: var(--fire-orange); }
+  .auction-stat-sub { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+  .auction-your-bid { background: #0a0e1a; border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+  .auction-bid-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 10px; }
+  .auction-bid-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+  .auction-bid-row .qty-btn { width: auto; padding: 8px 16px; font-size: 14px; }
+  .auction-bid-input { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 28px; color: var(--fire-orange); min-width: 140px; }
+  .auction-bid-sub { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -405,35 +421,53 @@
         <span class="bal" id="walletBal"></span>
       </div>
     </div>
-    <div class="warning-box" id="warningBox">⚠️ Insufficient CRO balance for this lot.</div>
-    <div class="qty-section">
-      <div class="qty-label">Quantity (Lots)</div>
-      <div class="qty-row">
-        <button class="qty-btn" onclick="changeQty(-1)">−</button>
-        <div class="qty-display" id="qtyDisplay">1</div>
-        <button class="qty-btn" onclick="changeQty(1)">+</button>
-        <div class="qty-total">Total: <strong id="totalCtr">--</strong> CTR</div>
+    <div class="warning-box" id="warningBox">⚠️ Insufficient CRO balance for this bid.</div>
+
+    <!-- Auction info for selected lot -->
+    <div class="auction-info" id="auctionInfo" style="display:none">
+      <div class="auction-lot-name" id="auctionLotName">--</div>
+      <div class="auction-row">
+        <div class="auction-stat">
+          <div class="auction-stat-label">Current High Bid</div>
+          <div class="auction-stat-value" id="auctionHighBid">No bids yet</div>
+          <div class="auction-stat-sub" id="auctionHighBidder">—</div>
+        </div>
+        <div class="auction-stat">
+          <div class="auction-stat-label">Minimum Bid</div>
+          <div class="auction-stat-value fire" id="auctionMinBid">--</div>
+          <div class="auction-stat-sub">Starting price or +50 CRO</div>
+        </div>
+      </div>
+      <div class="auction-your-bid">
+        <div class="auction-bid-label">Your Bid (CRO)</div>
+        <div class="auction-bid-row">
+          <button class="qty-btn" onclick="adjustBid(-50)">−50</button>
+          <div class="auction-bid-input" id="yourBidDisplay">--</div>
+          <button class="qty-btn" onclick="adjustBid(50)">+50</button>
+        </div>
+        <div class="auction-bid-sub" id="bidCtrAmount">≈ -- CTR</div>
       </div>
     </div>
-    <div class="bid-summary">
-      <div class="row"><span class="k">Lot Size</span><span class="v" id="sumLot">--</span></div>
-      <div class="row"><span class="k">Quantity</span><span class="v" id="sumQty">1</span></div>
-      <div class="row"><span class="k">Total CTR</span><span class="v highlight" id="sumCtr">--</span></div>
-      <div class="row"><span class="k">Cost (CRO)</span><span class="v highlight" id="sumCro">--</span></div>
+
+    <div class="bid-summary" id="bidSummary" style="display:none">
+      <div class="row"><span class="k">Lot</span><span class="v" id="sumLot">--</span></div>
+      <div class="row"><span class="k">CTR Amount</span><span class="v highlight" id="sumCtr">--</span></div>
+      <div class="row"><span class="k">Your Bid</span><span class="v highlight" id="sumCro">--</span></div>
+      <div class="row"><span class="k">Min. Hold</span><span class="v" id="sumHold">--</span></div>
     </div>
     <button class="btn-bid" id="btnBid" onclick="placeBid()" disabled>Connect Wallet to Bid</button>
   </div>
 
   <div class="bids-section">
     <div class="bids-header">
-      <h3>📋 Recent Bids</h3>
+      <h3>📋 Auction Board</h3>
       <span class="bids-count" id="bidsCount">0</span>
     </div>
     <div id="bidsBody">
       <div class="bids-empty" id="bidsEmpty">No bids yet. Be the first! 🔥</div>
       <div class="bids-table-wrap">
         <table class="bids-table" id="bidsTable" style="display:none">
-          <thead><tr><th>Wallet</th><th>Lot</th><th>Qty</th><th>Total CTR</th><th>Cost CRO</th><th>Time</th></tr></thead>
+          <thead><tr><th>Lot</th><th>High Bidder</th><th>Bid (CRO)</th><th>CTR</th><th>Time</th></tr></thead>
           <tbody id="bidsTbody"></tbody>
         </table>
       </div>
@@ -443,10 +477,10 @@
   <div class="rules-section">
     <h3>📜 How It Works</h3>
     <div class="rules-grid">
-      <div class="rule-item"><div class="num">01</div>Connect your Cronos wallet (MetaMask, Crypto.com DeFi Wallet, etc.)</div>
-      <div class="rule-item"><div class="num">02</div>Only CTR holders can bid. Each lot tier requires a minimum CTR balance in your wallet.</div>
-      <div class="rule-item"><div class="num">03</div>Select your lot and place your bid. Price is the live DexScreener rate — zero tax.</div>
-      <div class="rule-item"><div class="num">04</div>Winning bids are settled manually. CTR is sent to your wallet after the sale closes.</div>
+      <div class="rule-item"><div class="num">01</div>Connect your Cronos wallet. Only CTR holders can participate.</div>
+      <div class="rule-item"><div class="num">02</div>Each lot is a single auction. Select a lot and outbid the current highest bidder by at least 50 CRO.</div>
+      <div class="rule-item"><div class="num">03</div>The highest bidder at the end of Firesale Friday wins the lot. Zero tax on CTR.</div>
+      <div class="rule-item"><div class="num">04</div>Winners are settled manually. CTR is sent to your wallet after you send CRO.</div>
     </div>
   </div>
 
@@ -477,7 +511,7 @@ const LOTS = [
 const CTR_TOKEN = "0xF3672F0cF2E45B28AC4a1D50FD8aC2eB555c21FC";
 const CTR_DECIMALS = 18;
 
-let S = { wallet:null, croBalance:0, ctrBalance:0, ctrPrice:0, ctrChange24h:0, ctrMcap:0, ctrVolume:0, croPrice:0, selectedLot:null, qty:1, bids:[] };
+let S = { wallet:null, croBalance:0, ctrBalance:0, ctrPrice:0, ctrChange24h:0, ctrMcap:0, ctrVolume:0, croPrice:0, selectedLot:null, yourBid:0, bids:[] };
 const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 const fmtC=n=>n>=1e9?`${(n/1e9).toFixed(2)}B`:n>=1e6?`${(n/1e6).toFixed(2)}M`:n>=1e3?`${(n/1e3).toFixed(1)}K`:n.toFixed(0);
@@ -558,33 +592,219 @@ function renderPrice(){$('ctrPrice').textContent=S.ctrPrice>0?`$${fmtP(S.ctrPric
 function renderLots(){const g=$('lotsGrid');g.innerHTML='';LOTS.forEach(l=>{const usd=l.amount*S.ctrPrice,cro=S.croPrice>0?usd/S.croPrice:0;const isUnlocked=!S.wallet||S.ctrBalance>=l.minHold;const c=document.createElement('div');c.className=`lot-card${S.selectedLot===l.id?' selected':''}${!isUnlocked&&S.wallet?' locked':''}`;c.onclick=()=>{if(!S.wallet){toast('Connect your wallet first.','error');return;}if(!isUnlocked){toast(`You need at least ${fmtC(l.minHold)} CTR to unlock this lot. You hold ${fmtC(S.ctrBalance)}.`,'error');return;}selLot(l.id);};c.innerHTML=`<div class="lot-tag ${l.tag}">${l.tagLabel}</div><div class="lot-amount">${fmtC(l.amount)}</div><div class="lot-token">CTR Tokens</div><div class="lot-price">${cro>0?fmtC(cro)+' CRO':'...'}<span class="usd">(≈ $${usd>0?fmtC(usd):'...'})</span></div><div class="lot-req">${S.wallet&&!isUnlocked?'🔒':S.wallet?'🔓':''} Hold ${fmtC(l.minHold)} CTR</div>`;g.appendChild(c);});}
 function selLot(id){S.selectedLot=id;S.qty=1;$('qtyDisplay').textContent='1';renderLots();updSummary();chkBal();}
 
-// ===================== QTY =====================
-function changeQty(d){S.qty=Math.max(1,Math.min(10,S.qty+d));$('qtyDisplay').textContent=S.qty;updSummary();chkBal();}
-
-// ===================== SUMMARY =====================
-function updSummary(){const l=LOTS.find(x=>x.id===S.selectedLot);if(!l||S.ctrPrice===0){$('sumLot').textContent=l?l.label:'--';$('sumQty').textContent=S.qty;$('sumCtr').textContent='--';$('sumCro').textContent='--';$('totalCtr').textContent='--';updBtn();return;}const tc=l.amount*S.qty,usd=tc*S.ctrPrice,cro=S.croPrice>0?usd/S.croPrice:0;$('sumLot').textContent=`${l.label} (${fmtC(l.amount)})`;$('sumQty').textContent=S.qty;$('sumCtr').textContent=fmtC(tc);$('sumCro').textContent=cro>0?fmt(cro,2)+' CRO':'...';$('totalCtr').textContent=fmtC(tc);updBtn();}
-function updBtn(){const b=$('btnBid');if(!S.wallet){b.textContent='Connect Wallet to Bid';b.disabled=true;}else if(!S.selectedLot){b.textContent='Select a Lot First';b.disabled=true;}else{const l=LOTS.find(x=>x.id===S.selectedLot),cro=S.croPrice>0?(l.amount*S.qty*S.ctrPrice)/S.croPrice:0;b.textContent=cro>0?`🔥 Place Bid — ${fmt(cro,2)} CRO`:'🔥 Place Bid';b.disabled=false;}}
-
 // ===================== WALLET =====================
-async function connectWallet(){if(!window.ethereum){toast('No wallet detected. Install MetaMask or Crypto.com DeFi Wallet.','error');return;}const btn=$('btnConnect');try{btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting...';const accs=await window.ethereum.request({method:'eth_requestAccounts'});if(!accs.length)throw new Error('No account');try{await window.ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:CRONOS_CHAIN_ID}]});}catch(e){if(e.code===4902)await window.ethereum.request({method:'wallet_addEthereumChain',params:[{chainId:CRONOS_CHAIN_ID,chainName:'Cronos',nativeCurrency:{name:'CRO',symbol:'CRO',decimals:18},rpcUrls:[CRONOS_RPC],blockExplorerUrls:['https://explorer.cronos.org/']}]});}S.wallet=accs[0];await fetchBal();renderWallet();updSummary();toast('Wallet connected on Cronos!','success');window.ethereum.on('accountsChanged',a=>{if(!a.length)disconnectWallet();else{S.wallet=a[0];fetchBal().then(()=>{renderWallet();updSummary();});}});window.ethereum.on('chainChanged',()=>{fetchBal().then(()=>renderWallet());});}catch(e){console.error(e);toast('Connection failed: '+(e.message||e),'error');}finally{btn.disabled=false;btn.textContent='Connect Wallet';}}
-function disconnectWallet(){S.wallet=null;S.croBalance=0;renderWallet();updSummary();toast('Wallet disconnected','info');}
+async function connectWallet(){if(!window.ethereum){toast('No wallet detected. Install MetaMask or Crypto.com DeFi Wallet.','error');return;}const btn=$('btnConnect');try{btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting...';const accs=await window.ethereum.request({method:'eth_requestAccounts'});if(!accs.length)throw new Error('No account');try{await window.ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:CRONOS_CHAIN_ID}]});}catch(e){if(e.code===4902)await window.ethereum.request({method:'wallet_addEthereumChain',params:[{chainId:CRONOS_CHAIN_ID,chainName:'Cronos',nativeCurrency:{name:'CRO',symbol:'CRO',decimals:18},rpcUrls:[CRONOS_RPC],blockExplorerUrls:['https://explorer.cronos.org/']}]});}S.wallet=accs[0];await fetchBal();renderWallet();updAuction();toast('Wallet connected on Cronos!','success');window.ethereum.on('accountsChanged',a=>{if(!a.length)disconnectWallet();else{S.wallet=a[0];fetchBal().then(()=>{renderWallet();updAuction();});}});window.ethereum.on('chainChanged',()=>{fetchBal().then(()=>renderWallet());});}catch(e){console.error(e);toast('Connection failed: '+(e.message||e),'error');}finally{btn.disabled=false;btn.textContent='Connect Wallet';}}
+function disconnectWallet(){S.wallet=null;S.croBalance=0;S.ctrBalance=0;S.selectedLot=null;renderWallet();updAuction();toast('Wallet disconnected','info');}
 async function fetchBal(){if(!S.wallet)return;try{const b=await window.ethereum.request({method:'eth_getBalance',params:[S.wallet,'latest']});S.croBalance=parseInt(b,16)/1e18;}catch(e){console.error(e);}
-  // Fetch CTR token balance via RPC
   try{const data='0x70a08231'+S.wallet.slice(2).padStart(64,'0');const r=await window.ethereum.request({method:'eth_call',params:[{to:CTR_TOKEN,data},'latest']});S.ctrBalance=parseInt(r,16)/Math.pow(10,CTR_DECIMALS);}catch(e){console.error('CTR balance error:',e);S.ctrBalance=0;}}
 function renderWallet(){const c=!!S.wallet;$('btnConnect').style.display=c?'none':'inline-flex';$('btnDisconnect').style.display=c?'inline-flex':'none';$('walletInfo').style.display=c?'flex':'none';if(c){$('walletAddr').textContent=trunc(S.wallet);$('walletBal').textContent=fmt(S.croBalance,2)+' CRO · '+fmtC(S.ctrBalance)+' CTR';}chkBal();renderLots();}
-function chkBal(){const w=$('warningBox');if(!S.wallet||!S.selectedLot||S.ctrPrice===0||S.croPrice===0){w.classList.remove('show');return;}const l=LOTS.find(x=>x.id===S.selectedLot),need=(l.amount*S.qty*S.ctrPrice)/S.croPrice;w.classList.toggle('show',S.croBalance<need);}
+
+const BID_STEP = 50; // CRO increment
+
+// Get the highest bid for a given lot
+function getHighBid(lotId) {
+  const lotBids = S.bids.filter(b => b.lotId === lotId);
+  if (lotBids.length === 0) return null;
+  return lotBids.reduce((max, b) => b.croBid > max.croBid ? b : max, lotBids[0]);
+}
+
+// Get minimum bid for a lot (starting price or highest + 50)
+function getMinBid(lotId) {
+  const high = getHighBid(lotId);
+  if (!high) {
+    // Starting price = market price in CRO
+    const lot = LOTS.find(l => l.id === lotId);
+    const usd = lot.amount * S.ctrPrice;
+    return S.croPrice > 0 ? Math.ceil(usd / S.croPrice) : 0;
+  }
+  return high.croBid + BID_STEP;
+}
+
+// ===================== LOTS =====================
+function renderLots(){
+  const g=$('lotsGrid');g.innerHTML='';
+  LOTS.forEach(l=>{
+    const usd=l.amount*S.ctrPrice;
+    const cro=S.croPrice>0?usd/S.croPrice:0;
+    const isUnlocked=!S.wallet||S.ctrBalance>=l.minHold;
+    const high=getHighBid(l.id);
+    const c=document.createElement('div');
+    c.className=`lot-card${S.selectedLot===l.id?' selected':''}${!isUnlocked&&S.wallet?' locked':''}`;
+    c.onclick=()=>{
+      if(!S.wallet){toast('Connect your wallet first.','error');return;}
+      if(!isUnlocked){toast(`You need at least ${fmtC(l.minHold)} CTR to unlock this lot. You hold ${fmtC(S.ctrBalance)}.`,'error');return;}
+      selLot(l.id);
+    };
+    const highBidHtml = high
+      ? `<div style="font-size:11px;color:var(--accent-cyan);margin-top:6px">⚡ High: ${fmt(high.croBid,0)} CRO by ${trunc(high.wallet)}</div>`
+      : `<div style="font-size:11px;color:var(--text-muted);margin-top:6px">No bids yet</div>`;
+    c.innerHTML=`<div class="lot-tag ${l.tag}">${l.tagLabel}</div><div class="lot-amount">${fmtC(l.amount)}</div><div class="lot-token">CTR Tokens</div><div class="lot-price">${cro>0?fmtC(cro)+' CRO':'...'}<span class="usd">(≈ $${usd>0?fmtC(usd):'...'})</span></div>${highBidHtml}<div class="lot-req">${S.wallet&&!isUnlocked?'🔒':S.wallet?'🔓':''} Hold ${fmtC(l.minHold)} CTR</div>`;
+    g.appendChild(c);
+  });
+}
+
+function selLot(id){
+  S.selectedLot=id;
+  S.yourBid=getMinBid(id);
+  updAuction();
+  chkBal();
+}
+
+// ===================== AUCTION UI =====================
+function updAuction(){
+  const l=LOTS.find(x=>x.id===S.selectedLot);
+  if(!l){
+    $('auctionInfo').style.display='none';
+    $('bidSummary').style.display='none';
+    updBtn();
+    return;
+  }
+  $('auctionInfo').style.display='block';
+  $('bidSummary').style.display='grid';
+  $('auctionLotName').textContent=`${l.tagLabel} — ${fmtC(l.amount)} CTR`;
+
+  const high=getHighBid(l.id);
+  const minBid=getMinBid(l.id);
+
+  if(high){
+    $('auctionHighBid').textContent=fmt(high.croBid,0)+' CRO';
+    $('auctionHighBidder').textContent='by '+trunc(high.wallet);
+  } else {
+    $('auctionHighBid').textContent='No bids yet';
+    $('auctionHighBidder').textContent='Be the first!';
+  }
+  $('auctionMinBid').textContent=fmt(minBid,0)+' CRO';
+
+  // Ensure yourBid >= minBid
+  if(!S.yourBid||S.yourBid<minBid) S.yourBid=minBid;
+  $('yourBidDisplay').textContent=fmt(S.yourBid,0)+' CRO';
+
+  // Show equivalent CTR
+  if(S.croPrice>0){
+    const ctrEquiv=S.yourBid*S.croPrice/S.ctrPrice;
+    $('bidCtrAmount').textContent=`≈ ${fmtC(l.amount)} CTR for ${fmt(S.yourBid,0)} CRO`;
+  }
+
+  // Summary
+  $('sumLot').textContent=l.label+' ('+fmtC(l.amount)+' CTR)';
+  $('sumCtr').textContent=fmtC(l.amount);
+  $('sumCro').textContent=fmt(S.yourBid,0)+' CRO';
+  $('sumHold').textContent=fmtC(l.minHold)+' CTR';
+
+  updBtn();
+}
+
+function adjustBid(delta){
+  if(!S.selectedLot)return;
+  const minBid=getMinBid(S.selectedLot);
+  S.yourBid=Math.max(minBid,(S.yourBid||minBid)+delta);
+  updAuction();
+  chkBal();
+}
+
+function updBtn(){
+  const b=$('btnBid');
+  if(!S.wallet){b.textContent='Connect Wallet to Bid';b.disabled=true;}
+  else if(!S.selectedLot){b.textContent='Select a Lot First';b.disabled=true;}
+  else{
+    b.textContent=`🔥 Place Bid — ${fmt(S.yourBid||0,0)} CRO`;
+    b.disabled=false;
+  }
+}
+
+function chkBal(){
+  const w=$('warningBox');
+  if(!S.wallet||!S.selectedLot||!S.yourBid){w.classList.remove('show');return;}
+  w.classList.toggle('show',S.croBalance<S.yourBid);
+}
 
 // ===================== JSONBIN =====================
-async function loadBids(){if(JSONBIN_ID==="YOUR_BIN_ID_HERE")return;try{const r=await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`,{headers:{'X-Master-Key':JSONBIN_API_KEY}});const d=await r.json();S.bids=d.record?.bids||[];renderBids();}catch(e){console.error(e);}}
-async function saveBids(){if(JSONBIN_ID==="YOUR_BIN_ID_HERE"){toast('JSONBin not configured. Set JSONBIN_ID and JSONBIN_API_KEY.','error');return false;}try{const r=await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':JSONBIN_API_KEY},body:JSON.stringify({bids:S.bids})});return r.ok;}catch(e){console.error(e);return false;}}
-function renderBids(){$('bidsCount').textContent=S.bids.length;if(S.bids.length===0){$('bidsEmpty').style.display='block';$('bidsTable').style.display='none';return;}$('bidsEmpty').style.display='none';$('bidsTable').style.display='table';$('bidsTbody').innerHTML=[...S.bids].reverse().slice(0,25).map(b=>`<tr><td style="color:var(--accent-cyan)">${trunc(b.wallet)}</td><td>${b.lotLabel}</td><td>${b.qty}</td><td style="color:var(--fire-orange);font-weight:600">${fmtC(b.totalCtr)} CTR</td><td>${fmt(b.croCost,2)} CRO</td><td style="color:var(--text-muted)">${tAgo(b.timestamp)}</td></tr>`).join('');}
+async function loadBids(){try{const r=await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`,{headers:{'X-Master-Key':JSONBIN_API_KEY}});const d=await r.json();S.bids=d.record?.bids||[];renderBids();renderLots();if(S.selectedLot)updAuction();}catch(e){console.error(e);}}
+async function saveBids(){try{const r=await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':JSONBIN_API_KEY},body:JSON.stringify({bids:S.bids})});return r.ok;}catch(e){console.error(e);return false;}}
+
+function renderBids(){
+  // Show highest bid per lot
+  const highBids=LOTS.map(l=>{const h=getHighBid(l.id);return h?{...h,lotLabel:l.label,lotAmount:l.amount}:null;}).filter(Boolean);
+  $('bidsCount').textContent=S.bids.length;
+  if(S.bids.length===0){$('bidsEmpty').style.display='block';$('bidsTable').style.display='none';return;}
+  $('bidsEmpty').style.display='none';$('bidsTable').style.display='table';
+  // Show all bids newest first
+  $('bidsTbody').innerHTML=[...S.bids].reverse().slice(0,30).map(b=>{
+    const lot=LOTS.find(l=>l.id===b.lotId);
+    const isHigh=getHighBid(b.lotId)?.timestamp===b.timestamp&&getHighBid(b.lotId)?.wallet===b.wallet;
+    return `<tr style="${isHigh?'background:#ff3d0008':''}"><td>${lot?lot.label:b.lotId}</td><td style="color:var(--accent-cyan)">${trunc(b.wallet)}${isHigh?' 👑':''}</td><td style="color:var(--fire-orange);font-weight:600">${fmt(b.croBid,0)} CRO</td><td>${fmtC(lot?lot.amount:0)} CTR</td><td style="color:var(--text-muted)">${tAgo(b.timestamp)}</td></tr>`;
+  }).join('');
+}
 function tAgo(ts){const d=Date.now()-new Date(ts).getTime();if(d<6e4)return'just now';if(d<36e5)return Math.floor(d/6e4)+'m ago';if(d<864e5)return Math.floor(d/36e5)+'h ago';return Math.floor(d/864e5)+'d ago';}
 
 // ===================== PLACE BID =====================
-async function placeBid(){if(!S.wallet){toast('Connect your wallet first.','error');return;}if(!S.selectedLot){toast('Select a lot first.','error');return;}const l=LOTS.find(x=>x.id===S.selectedLot),tc=l.amount*S.qty,usd=tc*S.ctrPrice,need=S.croPrice>0?usd/S.croPrice:0;await fetchBal();renderWallet();if(S.ctrBalance<l.minHold){toast(`You need at least ${fmtC(l.minHold)} CTR to bid on this lot.`,'error');S.selectedLot=null;renderLots();updSummary();return;}if(S.croBalance<need){toast(`Insufficient CRO. Need ${fmt(need,2)} but have ${fmt(S.croBalance,2)}.`,'error');return;}const btn=$('btnBid');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Submitting Bid...';const bid={wallet:S.wallet,lotId:l.id,lotLabel:l.label,qty:S.qty,totalCtr:tc,ctrPrice:S.ctrPrice,croCost:need,croBalance:S.croBalance,timestamp:new Date().toISOString()};S.bids.push(bid);const ok=await saveBids();if(ok){toast(`🔥 Bid placed! ${fmtC(tc)} CTR for ${fmt(need,2)} CRO`,'success');renderBids();}else{S.bids.pop();}updSummary();}
+async function placeBid(){
+  if(!S.wallet){toast('Connect your wallet first.','error');return;}
+  if(!S.selectedLot){toast('Select a lot first.','error');return;}
+
+  const l=LOTS.find(x=>x.id===S.selectedLot);
+  const minBid=getMinBid(l.id);
+
+  // Refresh balances
+  await fetchBal();
+  renderWallet();
+
+  // Check CTR holding
+  if(S.ctrBalance<l.minHold){
+    toast(`You need at least ${fmtC(l.minHold)} CTR to bid on this lot.`,'error');
+    S.selectedLot=null;renderLots();updAuction();return;
+  }
+
+  // Check bid >= minimum
+  if(S.yourBid<minBid){
+    S.yourBid=minBid;
+    updAuction();
+    toast(`Minimum bid is ${fmt(minBid,0)} CRO.`,'error');
+    return;
+  }
+
+  // Check CRO balance
+  if(S.croBalance<S.yourBid){
+    toast(`Insufficient CRO. Need ${fmt(S.yourBid,0)} but have ${fmt(S.croBalance,2)}.`,'error');
+    return;
+  }
+
+  // Check if user already has highest bid on this lot
+  const high=getHighBid(l.id);
+  if(high&&high.wallet.toLowerCase()===S.wallet.toLowerCase()){
+    toast('You already have the highest bid on this lot!','info');
+    return;
+  }
+
+  const btn=$('btnBid');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span> Submitting Bid...';
+
+  const bid={
+    wallet:S.wallet,
+    lotId:l.id,
+    lotLabel:l.label,
+    croBid:S.yourBid,
+    ctrPrice:S.ctrPrice,
+    croBalance:S.croBalance,
+    ctrBalance:S.ctrBalance,
+    timestamp:new Date().toISOString(),
+  };
+
+  S.bids.push(bid);
+  const ok=await saveBids();
+  if(ok){
+    toast(`🔥 Bid placed! ${fmt(S.yourBid,0)} CRO on ${l.label}`,'success');
+    renderBids();renderLots();updAuction();
+  } else {
+    S.bids.pop();
+    toast('Failed to save bid. Try again.','error');
+  }
+  updBtn();
+}
 
 // ===================== INIT =====================
-function init(){spawnEmbers();updCD();setInterval(updCD,1000);fetchPrice();setInterval(fetchPrice,30000);loadBids();setInterval(loadBids,15000);renderLots();updSummary();if(window.ethereum?.selectedAddress){S.wallet=window.ethereum.selectedAddress;fetchBal().then(()=>{renderWallet();updSummary();});}}
+function init(){spawnEmbers();updCD();setInterval(updCD,1000);fetchPrice();setInterval(fetchPrice,30000);loadBids();setInterval(loadBids,15000);renderLots();updAuction();if(window.ethereum?.selectedAddress){S.wallet=window.ethereum.selectedAddress;fetchBal().then(()=>{renderWallet();updAuction();});}}
 document.addEventListener('DOMContentLoaded',init);
 </script>
 </body>
