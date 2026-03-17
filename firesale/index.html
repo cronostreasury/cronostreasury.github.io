@@ -502,6 +502,8 @@ const CRONOS_RPC = "https://evm.cronos.org";
 const DEX_PAIR = "https://api.dexscreener.com/latest/dex/pairs/cronos/0xf118aa245b0627b4752607620d0048b492a5f4fb";
 
 const LOTS = [
+  { id:"newbie1", tag:"standard", label:"New Holder #1", amount:50_000, tagLabel:"Open 🆓", minHold:0 },
+  { id:"newbie2", tag:"standard", label:"New Holder #2", amount:50_000, tagLabel:"Open 🆓", minHold:0 },
   { id:"enjoyer", tag:"standard", label:"CTR Enjoyer", amount:500_000, tagLabel:"Enjoyer 🦧", minHold:1_000_000 },
   { id:"whale",   tag:"standard", label:"CTR Whale",   amount:1_000_000, tagLabel:"Whale 🐋", minHold:10_000_000 },
   { id:"titan",   tag:"premium",  label:"CTR Titan",   amount:5_000_000, tagLabel:"Titan 🐉", minHold:20_000_000 },
@@ -640,7 +642,10 @@ function renderLots(){
     const highBidHtml = high
       ? `<div style="font-size:11px;color:var(--accent-cyan);margin-top:6px">⚡ High: ${fmt(getBidAmount(high),0)} CRO by ${trunc(high.wallet)}</div>`
       : `<div style="font-size:11px;color:var(--text-muted);margin-top:6px">No bids yet</div>`;
-    c.innerHTML=`<div class="lot-tag ${l.tag}">${l.tagLabel}</div><div class="lot-amount">${fmtC(l.amount)}</div><div class="lot-token">CTR Tokens</div><div class="lot-price">${cro>0?fmtC(cro)+' CRO':'...'}<span class="usd">(≈ $${usd>0?fmtC(usd):'...'})</span></div>${highBidHtml}<div class="lot-req">${S.wallet&&!isUnlocked?'🔒':S.wallet?'🔓':''} Hold ${fmtC(l.minHold)} CTR</div>`;
+    const reqText = l.minHold === 0
+      ? `${S.wallet?'🔓 ':''} Open to all wallets`
+      : `${S.wallet&&!isUnlocked?'🔒':S.wallet?'🔓':''} Hold ${fmtC(l.minHold)} CTR`;
+    c.innerHTML=`<div class="lot-tag ${l.tag}">${l.tagLabel}</div><div class="lot-amount">${fmtC(l.amount)}</div><div class="lot-token">CTR Tokens</div><div class="lot-price">${cro>0?fmtC(cro)+' CRO':'...'}<span class="usd">(≈ $${usd>0?fmtC(usd):'...'})</span></div>${highBidHtml}<div class="lot-req">${reqText}</div>`;
     g.appendChild(c);
   });
 }
