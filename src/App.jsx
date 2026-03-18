@@ -547,7 +547,7 @@ export default function CTRDashboard() {
             { label: "Market Cap", value: liveMarketCap !== null ? `$${fmtCompact(liveMarketCap)}` : "...", sub: "Live · DexScreener", c: "#7c3aed" },
             { label: "Total Value", value: (liveMarketCap !== null && !vaultLoading) ? `$${fmtCompact(liveMarketCap + vaultTotal)}` : "...", sub: "Market Cap + Treasury", c: "#a78bfa" },
             { label: "Total Supply", value: "1,000.00M", sub: "Fixed supply", c: "#f59e0b" },
-            { label: "Total Burned", value: burnLoading ? "..." : `${fmtCompact(burnedAmount)} CTR`, sub: burnedAmount > 0 ? `${(burnedAmount / TOTAL_SUPPLY * 100).toFixed(4)}% of supply`, c: "#ff6b6b" },
+            { label: "Total Burned", value: burnLoading ? "..." : `${fmtCompact(burnedAmount)} CTR`, sub: burnedAmount > 0 ? `${(burnedAmount / TOTAL_SUPPLY * 100).toFixed(4)}% of supply` : "Live · Dead Wallet", c: "#ff6b6b" },
             { label: "Vault TVL", value: vaultLoading ? "Loading..." : `$${fmtCompact(animVault)}`, sub: "Live · Cronos RPC", c: "#64ffda" },
           ].map(s => (
             <div key={s.label} className="stat-card">
