@@ -188,6 +188,24 @@
     50% { filter: drop-shadow(0 0 25px #ff3d0066); }
   }
 
+  .closed-banner { text-align: center; padding: 20px 0; }
+  .closed-title {
+    font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: clamp(16px, 4vw, 22px);
+    color: var(--text-muted); letter-spacing: .05em; margin-bottom: 6px;
+  }
+  .closed-sub { font-size: 12px; color: var(--text-muted); }
+
+  .winners-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
+  .winner-card {
+    background: var(--bg-card); border: 1px solid #ffab0033; border-radius: 12px; padding: 16px;
+    text-align: center; position: relative; overflow: hidden;
+  }
+  .winner-card::before { content:''; position: absolute; top:0;left:0;right:0; height: 2px; background: linear-gradient(90deg, var(--fire-yellow), var(--fire-orange)); }
+  .winner-card .wc-lot { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; color: var(--fire-orange); margin-bottom: 6px; }
+  .winner-card .wc-winner { font-size: 12px; color: var(--accent-cyan); font-weight: 600; }
+  .winner-card .wc-bid { font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 16px; margin-top: 6px; }
+  .winner-card .wc-none { font-size: 12px; color: var(--text-muted); }
+
   /* === PRICE CARD === */
   .price-card {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
@@ -298,6 +316,35 @@
   .rule-item { background: #0a0e1a; border: 1px solid #1a2744; border-radius: 10px; padding: 16px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
   .rule-item .num { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 18px; color: var(--fire-orange); margin-bottom: 6px; }
 
+  /* === SETTLEMENT BOX === */
+  .settlement-box {
+    margin-top: 30px; background: linear-gradient(135deg, #0c1220, #111a2e);
+    border: 1px solid var(--fire-orange); border-radius: 14px; padding: 28px;
+    text-align: center; position: relative; overflow: hidden;
+  }
+  .settlement-box::before { content:''; position: absolute; top:0;left:0;right:0; height: 3px; background: linear-gradient(90deg, var(--fire-orange), var(--fire-yellow), var(--fire-orange)); }
+  .settlement-icon { font-size: 36px; margin-bottom: 12px; }
+  .settlement-box h3 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; margin-bottom: 12px; color: var(--fire-orange); }
+  .settlement-box p { font-size: 13px; color: var(--text-secondary); line-height: 1.7; max-width: 560px; margin: 0 auto 20px; }
+  .settlement-box p strong { color: var(--text-primary); }
+  .settlement-wallet {
+    background: #0a0e1a; border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; display: inline-block; min-width: 320px; max-width: 100%;
+  }
+  .settlement-wallet-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .15em; margin-bottom: 8px; }
+  .settlement-wallet-addr {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent-cyan);
+    font-weight: 600; cursor: pointer; word-break: break-all; padding: 6px 0;
+    transition: color .2s;
+  }
+  .settlement-wallet-addr:hover { color: var(--fire-orange); }
+  .settlement-wallet-copy { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+  .settlement-link {
+    display: inline-block; margin-top: 16px; font-size: 12px;
+    color: var(--text-secondary); text-decoration: none; transition: color .2s;
+  }
+  .settlement-link:hover { color: var(--fire-orange); }
+
   /* === FOOTER === */
   .footer { text-align: center; margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); line-height: 2; }
   .footer a { color: var(--text-secondary); text-decoration: none; }
@@ -388,6 +435,11 @@
       <div class="countdown-box"><div class="num" id="cd-s">--</div><div class="unit">Seconds</div></div>
     </div>
     <div class="live-banner" id="liveBanner" style="display:none">🔥 FIRESALE IS LIVE — BID NOW! 🔥</div>
+    <div class="closed-banner" id="closedBanner" style="display:none">
+      <div class="closed-title">🏁 AUCTION CLOSED</div>
+      <div class="closed-sub">Winners are listed below. Next auction opens Friday 00:00 UTC.</div>
+    </div>
+    <div class="winners-grid" id="winnersGrid" style="display:none"></div>
   </div>
 
   <div class="price-card">
@@ -477,11 +529,24 @@
   <div class="rules-section">
     <h3>📜 How It Works</h3>
     <div class="rules-grid">
-      <div class="rule-item"><div class="num">01</div>Connect your Cronos wallet. Only CTR holders can participate.</div>
+      <div class="rule-item"><div class="num">01</div>Connect your Cronos wallet. Only CTR holders can participate (Open lots available for new holders).</div>
       <div class="rule-item"><div class="num">02</div>Each lot is a single auction. Select a lot and outbid the current highest bidder by at least 50 CRO.</div>
-      <div class="rule-item"><div class="num">03</div>The highest bidder at the end of Firesale Friday wins the lot. Zero tax on CTR.</div>
-      <div class="rule-item"><div class="num">04</div>Winners are settled manually. CTR is sent to your wallet after you send CRO.</div>
+      <div class="rule-item"><div class="num">03</div>Auction is live every Friday 00:00 UTC → Sunday 00:00 UTC (48h). Highest bidder wins.</div>
+      <div class="rule-item"><div class="num">04</div>Winners send CRO (bid amount) to the Treasury wallet. CTR is sent to your wallet after payment.</div>
     </div>
+  </div>
+
+  <!-- SETTLEMENT INFO -->
+  <div class="settlement-box">
+    <div class="settlement-icon">💰</div>
+    <h3>Won an auction? Here's how to claim your CTR</h3>
+    <p>Send your winning bid amount in <strong>CRO</strong> to the CTR Treasury wallet. Once confirmed, your CTR will be sent to your wallet.</p>
+    <div class="settlement-wallet">
+      <div class="settlement-wallet-label">Treasury Wallet</div>
+      <div class="settlement-wallet-addr" id="treasuryAddr" onclick="copyTreasury()">0x96A6cd06338eFE754f200Aba9fF07788c16E5F20</div>
+      <div class="settlement-wallet-copy" id="copyHint">Click to copy</div>
+    </div>
+    <a href="https://explorer.cronos.org/address/0x96A6cd06338eFE754f200Aba9fF07788c16E5F20" target="_blank" class="settlement-link">View on Cronos Explorer ↗</a>
   </div>
 
   <div class="footer">
@@ -556,34 +621,102 @@ function spawnEmbers(){
 
 // Wolf is now a CSS background element — no JS needed
 
-// ===================== COUNTDOWN =====================
-function isFridayUTC() {
-  return new Date().getUTCDay() === 5;
+// ===================== AUCTION STATE =====================
+// Friday 00:00 UTC → Sunday 00:00 UTC = LIVE (48h)
+// Sunday 00:00 UTC → Friday 00:00 UTC = CLOSED (shows winners)
+// Countdown always counts to next Friday 00:00 UTC
+
+function getAuctionState() {
+  const now = new Date();
+  const day = now.getUTCDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
+  if (day === 5 || day === 6) return 'live';
+  return 'closed';
 }
+
 function getNextFridayStart() {
-  const n = new Date();
-  const day = n.getUTCDay();
+  const now = new Date();
+  const day = now.getUTCDay();
   let daysUntilFri = (5 - day + 7) % 7;
-  if (daysUntilFri === 0) daysUntilFri = 7; // If Friday, count to NEXT Friday
-  const t = new Date(n);
+  if (daysUntilFri === 0) daysUntilFri = 7; // If Friday, show next Friday
+  if (day === 6) daysUntilFri = 6; // Saturday → next Friday = 6 days
+  const t = new Date(now);
   t.setUTCDate(t.getUTCDate() + daysUntilFri);
   return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 0, 0, 0));
 }
+
+function getAuctionEndTime() {
+  // End = Sunday 00:00 UTC of current week
+  const now = new Date();
+  const day = now.getUTCDay();
+  let daysUntilSun;
+  if (day === 5) daysUntilSun = 2;
+  else if (day === 6) daysUntilSun = 1;
+  else return null; // not live
+  const t = new Date(now);
+  t.setUTCDate(t.getUTCDate() + daysUntilSun);
+  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 0, 0, 0));
+}
+
+let _lastWinnersHash = '';
 function updCD() {
-  if (isFridayUTC()) {
-    // It's Friday — show LIVE banner, hide countdown
-    $('cdLabel').style.display = 'none';
-    $('cdGrid').style.display = 'none';
+  const state = getAuctionState();
+
+  if (state === 'live') {
+    $('cdLabel').textContent = 'Auction Closes In';
+    $('cdLabel').style.display = 'block';
+    $('cdGrid').style.display = 'flex';
     $('liveBanner').style.display = 'block';
+    $('closedBanner').style.display = 'none';
+    $('winnersGrid').style.display = 'none';
+    _lastWinnersHash = '';
+
+    const end = getAuctionEndTime();
+    if (end) {
+      const d = Math.max(0, end - Date.now());
+      $('cd-h').textContent = String(Math.floor(d / 36e5)).padStart(2, '0');
+      $('cd-m').textContent = String(Math.floor((d % 36e5) / 6e4)).padStart(2, '0');
+      $('cd-s').textContent = String(Math.floor((d % 6e4) / 1e3)).padStart(2, '0');
+    }
   } else {
+    $('cdLabel').textContent = 'Next Auction Opens In';
     $('cdLabel').style.display = 'block';
     $('cdGrid').style.display = 'flex';
     $('liveBanner').style.display = 'none';
+    $('closedBanner').style.display = 'block';
+
+    // Only re-render winners when bids change
+    const hash = JSON.stringify(S.bids.map(b=>b.lotId+getBidAmount(b)));
+    if (hash !== _lastWinnersHash) { renderWinners(); _lastWinnersHash = hash; }
+
     const d = Math.max(0, getNextFridayStart() - Date.now());
     $('cd-h').textContent = String(Math.floor(d / 36e5)).padStart(2, '0');
     $('cd-m').textContent = String(Math.floor((d % 36e5) / 6e4)).padStart(2, '0');
     $('cd-s').textContent = String(Math.floor((d % 6e4) / 1e3)).padStart(2, '0');
   }
+}
+
+function isAuctionLive() {
+  return getAuctionState() === 'live';
+}
+
+function renderWinners() {
+  const grid = $('winnersGrid');
+  grid.style.display = 'grid';
+  grid.innerHTML = LOTS.map(l => {
+    const high = getHighBid(l.id);
+    if (high) {
+      return `<div class="winner-card">
+        <div class="wc-lot">👑 ${l.tagLabel} — ${fmtC(l.amount)} CTR</div>
+        <div class="wc-winner">${trunc(high.wallet)}</div>
+        <div class="wc-bid">${fmt(getBidAmount(high), 0)} CRO</div>
+        <div style="font-size:10px;color:var(--fire-orange);margin-top:8px">Send ${fmt(getBidAmount(high), 0)} CRO to Treasury ↓</div>
+      </div>`;
+    }
+    return `<div class="winner-card">
+      <div class="wc-lot">${l.tagLabel} — ${fmtC(l.amount)} CTR</div>
+      <div class="wc-none">No bids this week</div>
+    </div>`;
+  }).join('');
 }
 
 // ===================== PRICE =====================
@@ -601,12 +734,12 @@ const BID_STEP = 50; // CRO increment
 
 // Get the highest bid for a given lot
 function getHighBid(lotId) {
+  const validLot = LOTS.find(l => l.id === lotId);
+  if (!validLot) return null;
   const lotBids = S.bids.filter(b => b.lotId === lotId);
   if (lotBids.length === 0) return null;
   return lotBids.reduce((max, b) => {
-    const bBid = b.croBid || b.croCost || 0;
-    const maxBid = max.croBid || max.croCost || 0;
-    return bBid > maxBid ? b : max;
+    return getBidAmount(b) > getBidAmount(max) ? b : max;
   }, lotBids[0]);
 }
 
@@ -635,6 +768,7 @@ function renderLots(){
     const c=document.createElement('div');
     c.className=`lot-card${S.selectedLot===l.id?' selected':''}${!isUnlocked&&S.wallet?' locked':''}`;
     c.onclick=()=>{
+      if(!isAuctionLive()){toast('Auction is closed. Come back next Friday!','error');return;}
       if(!S.wallet){toast('Connect your wallet first.','error');return;}
       if(!isUnlocked){toast(`You need at least ${fmtC(l.minHold)} CTR to unlock this lot. You hold ${fmtC(S.ctrBalance)}.`,'error');return;}
       selLot(l.id);
@@ -704,7 +838,8 @@ function adjustBid(delta){
 
 function updBtn(){
   const b=$('btnBid');
-  if(!S.wallet){b.textContent='Connect Wallet to Bid';b.disabled=true;}
+  if(!isAuctionLive()){b.textContent='🔒 Auction Closed — Next Friday';b.disabled=true;}
+  else if(!S.wallet){b.textContent='Connect Wallet to Bid';b.disabled=true;}
   else if(!S.selectedLot){b.textContent='Select a Lot First';b.disabled=true;}
   else{
     const bid=S.yourBid||0;
@@ -724,22 +859,22 @@ async function loadBids(){try{const r=await fetch(`https://api.jsonbin.io/v3/b/$
 async function saveBids(){try{const r=await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':JSONBIN_API_KEY},body:JSON.stringify({bids:S.bids})});return r.ok;}catch(e){console.error(e);return false;}}
 
 function renderBids(){
-  // Show highest bid per lot
-  const highBids=LOTS.map(l=>{const h=getHighBid(l.id);return h?{...h,lotLabel:l.label,lotAmount:l.amount}:null;}).filter(Boolean);
   $('bidsCount').textContent=S.bids.length;
   if(S.bids.length===0){$('bidsEmpty').style.display='block';$('bidsTable').style.display='none';return;}
   $('bidsEmpty').style.display='none';$('bidsTable').style.display='table';
-  // Show all bids newest first
   $('bidsTbody').innerHTML=[...S.bids].reverse().slice(0,30).map(b=>{
     const lot=LOTS.find(l=>l.id===b.lotId);
-    const isHigh=getHighBid(b.lotId)?.timestamp===b.timestamp&&getHighBid(b.lotId)?.wallet===b.wallet;
-    return `<tr style="${isHigh?'background:#ff3d0008':''}"><td>${lot?lot.label:b.lotId}</td><td style="color:var(--accent-cyan)">${trunc(b.wallet)}${isHigh?' 👑':''}</td><td style="color:var(--fire-orange);font-weight:600">${fmt(getBidAmount(b),0)} CRO</td><td>${fmtC(lot?lot.amount:0)} CTR</td><td style="color:var(--text-muted)">${tAgo(b.timestamp)}</td></tr>`;
+    if(!lot) return ''; // skip old bids with removed lot IDs
+    const highBid=getHighBid(b.lotId);
+    const isHigh=highBid&&highBid.timestamp===b.timestamp&&highBid.wallet===b.wallet;
+    return `<tr style="${isHigh?'background:#ff3d0008':''}"><td>${lot.label}</td><td style="color:var(--accent-cyan)">${trunc(b.wallet)}${isHigh?' 👑':''}</td><td style="color:var(--fire-orange);font-weight:600">${fmt(getBidAmount(b),0)} CRO</td><td>${fmtC(lot.amount)} CTR</td><td style="color:var(--text-muted)">${tAgo(b.timestamp)}</td></tr>`;
   }).join('');
 }
 function tAgo(ts){const d=Date.now()-new Date(ts).getTime();if(d<6e4)return'just now';if(d<36e5)return Math.floor(d/6e4)+'m ago';if(d<864e5)return Math.floor(d/36e5)+'h ago';return Math.floor(d/864e5)+'d ago';}
 
 // ===================== PLACE BID =====================
 async function placeBid(){
+  if(!isAuctionLive()){toast('Auction is closed. Come back next Friday!','error');return;}
   if(!S.wallet){toast('Connect your wallet first.','error');return;}
   if(!S.selectedLot){toast('Select a lot first.','error');return;}
 
@@ -802,6 +937,15 @@ async function placeBid(){
     toast('Failed to save bid. Try again.','error');
   }
   updBtn();
+}
+
+// ===================== COPY TREASURY =====================
+function copyTreasury(){
+  navigator.clipboard.writeText('0x96A6cd06338eFE754f200Aba9fF07788c16E5F20').then(()=>{
+    $('copyHint').textContent='✅ Copied!';
+    setTimeout(()=>$('copyHint').textContent='Click to copy',2000);
+    toast('Treasury wallet address copied!','success');
+  }).catch(()=>{toast('Failed to copy. Please copy manually.','error');});
 }
 
 // ===================== INIT =====================
