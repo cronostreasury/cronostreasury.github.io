@@ -16,7 +16,7 @@ const STAKED_PACK = {
   symbol: "PACK",
   name: "Pack Token (Staked)",
   label: "PACK (Staked)",
-  amount: 1393025,
+  amount: 1538646,
   address: "0x0d0b4a6FC6e7f5635C2FF38dE75AF2e96D6D6804",
   decimals: 18,
   color: "#E94040",
@@ -26,10 +26,9 @@ const STAKED_PACK = {
   stakedLabel: "Wolfswap Vault · 33% APY",
 };
 
-const MOCK_CTR = {
-  totalSupply: 1_000_000_000,
-  totalBurned: 0,
-};
+const TOTAL_SUPPLY = 1_000_000_000;
+const BURN_WALLET = "0x000000000000000000000000000000000000dEaD";
+const CTR_ADDRESS = "0xF3672F0cF2E45B28AC4a1D50FD8aC2eB555c21FC";
 
 
 
@@ -308,7 +307,8 @@ export default function CTRDashboard() {
   const [vaultTokens, setVaultTokens] = useState(TOKENS.map(t => ({ ...t, amount: 0, usdPrice: 0 })));
   const [vaultLoading, setVaultLoading] = useState(true);
   const [treasuryHistory, setTreasuryHistory] = useState([]);
-  const ctr = MOCK_CTR;
+  const [burnedAmount, setBurnedAmount] = useState(0);
+  const [burnLoading, setBurnLoading] = useState(true);
 
   const packToken = vaultTokens.find(t => t.symbol === "PACK");
   const packUsdPrice = packToken ? packToken.usdPrice : 0;
@@ -404,6 +404,22 @@ export default function CTRDashboard() {
       .catch(() => setTreasuryHistory([]));
   }, []);
 
+  // Fetch burned CTR from dead wallet
+  useEffect(() => {
+    const fetchBurned = async () => {
+      try {
+        const burned = await getTokenBalance(CTR_ADDRESS, BURN_WALLET, 18);
+        setBurnedAmount(burned);
+        setBurnLoading(false);
+      } catch (e) {
+        setBurnLoading(false);
+      }
+    };
+    fetchBurned();
+    const interval = setInterval(fetchBurned, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const displayChange = priceChange24h !== null ? priceChange24h : 0;
   const changeColor = displayChange >= 0 ? "#64ffda" : "#ff6b6b";
   const changePrefix = displayChange >= 0 ? "+" : "";
@@ -418,6 +434,7 @@ export default function CTRDashboard() {
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
         @keyframes slideIn { from{transform:translateY(-8px);opacity:0} to{transform:translateY(0);opacity:1} }
         @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes firesalePulse { 0%,100%{box-shadow:0 0 8px #ff3d0000} 50%{box-shadow:0 0 14px #ff3d0033} }
         .live-dot { animation: pulse 2s infinite; }
         .new-row { animation: slideIn .4s ease; }
         .spinner { animation: spin 1s linear infinite; }
@@ -448,6 +465,10 @@ export default function CTRDashboard() {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            <a href="/firesale/" style={{ display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg, #ff3d0018, #ff6d0010)", border: "1px solid #ff3d0044", borderRadius: 99, padding: "4px 12px", textDecoration: "none", animation: "firesalePulse 2s ease-in-out infinite" }}>
+              <span style={{ fontSize: 12 }}>🔥</span>
+              <span style={{ fontSize: 10, color: "#ff6d00", fontFamily: "'DM Mono',monospace", fontWeight: 700, letterSpacing: ".08em" }}>Firesale</span>
+            </a>
             <a href="https://x.com/CronosTreasury" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="#e2e8f0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.741l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
               <span style={{ fontSize: 10, color: "#e2e8f0", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>@CronosTreasury</span>
@@ -459,10 +480,6 @@ export default function CTRDashboard() {
             <a href="https://debank.com/profile/0x96a6cd06338efe754f200aba9ff07788c16e5f20" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff7c1f"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
               <span style={{ fontSize: 10, color: "#ff7c1f", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>DeBank</span>
-            </a>
-            <a href="https://cronostreasury.github.io/CTR-Governance/" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
-              <span style={{ fontSize: 12 }}>🗳️</span>
-              <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>Governance</span>
             </a>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 13, color: "#64ffda", fontFamily: "'DM Mono',monospace", fontWeight: 600 }}>
@@ -530,7 +547,7 @@ export default function CTRDashboard() {
             { label: "Market Cap", value: liveMarketCap !== null ? `$${fmtCompact(liveMarketCap)}` : "...", sub: "Live · DexScreener", c: "#7c3aed" },
             { label: "Total Value", value: (liveMarketCap !== null && !vaultLoading) ? `$${fmtCompact(liveMarketCap + vaultTotal)}` : "...", sub: "Market Cap + Treasury", c: "#a78bfa" },
             { label: "Total Supply", value: "1,000.00M", sub: "Fixed supply", c: "#f59e0b" },
-            { label: "Total Burned", value: "0 CTR", sub: "Burn program starting soon", c: "#ff6b6b" },
+            { label: "Total Burned", value: burnLoading ? "..." : `${fmtCompact(burnedAmount)} CTR`, sub: burnedAmount > 0 ? `${(burnedAmount / TOTAL_SUPPLY * 100).toFixed(4)}% of supply`, c: "#ff6b6b" },
             { label: "Vault TVL", value: vaultLoading ? "Loading..." : `$${fmtCompact(animVault)}`, sub: "Live · Cronos RPC", c: "#64ffda" },
           ].map(s => (
             <div key={s.label} className="stat-card">
@@ -609,27 +626,50 @@ export default function CTRDashboard() {
               <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>Cumulative supply reduction</div>
             </div>
             <div style={{ padding: 20 }}>
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
-                <div style={{ width: 140, height: 140, borderRadius: "50%", background: "conic-gradient(#ff6b6b 0deg, #1e293b 0deg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <div style={{ width: 104, height: 104, borderRadius: "50%", background: "#0d1226", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ fontSize: 24, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: "#ff6b6b" }}>0%</div>
-                    <div style={{ fontSize: 9, color: "#475569", letterSpacing: ".1em" }}>BURNED</div>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {[
-                  { label: "Total Burned", val: "0 CTR", c: "#ff6b6b" },
-                  { label: "Total Supply", val: "1,000.00M CTR", c: "#64ffda" },
-                  { label: "Burn Rate", val: "Starting soon", c: "#f59e0b" },
-                  { label: "Est. Deflation", val: "TBD", c: "#7c3aed" },
-                ].map(s => (
-                  <div key={s.label} style={{ background: "#1a2440", borderRadius: 10, padding: "10px 14px" }}>
-                    <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{s.label}</div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: s.c, fontFamily: "'DM Mono',monospace" }}>{s.val}</div>
-                  </div>
-                ))}
-              </div>
+              {(() => {
+                const burnPct = burnedAmount / TOTAL_SUPPLY * 100;
+                const deg = Math.min(burnPct / 100 * 360, 360);
+                return (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+                      <div style={{ width: 140, height: 140, borderRadius: "50%", background: `conic-gradient(#ff6b6b ${deg}deg, #1e293b ${deg}deg)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ width: 104, height: 104, borderRadius: "50%", background: "#0d1226", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                          <div style={{ fontSize: 24, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: "#ff6b6b" }}>
+                            {burnLoading ? "..." : `${burnPct < 0.001 ? burnPct.toFixed(5) : burnPct.toFixed(3)}%`}
+                          </div>
+                          <div style={{ fontSize: 9, color: "#475569", letterSpacing: ".1em" }}>BURNED</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      {[
+                        { label: "Total Burned", val: burnLoading ? "..." : `${fmtCompact(burnedAmount)} CTR`, c: "#ff6b6b" },
+                        { label: "Total Supply", val: "1,000.00M CTR", c: "#64ffda" },
+                        { label: "Circulating Supply", val: burnLoading ? "..." : `${fmtCompact(TOTAL_SUPPLY - burnedAmount)} CTR`, c: "#94a3b8" },
+                        { label: "Burn Wallet", val: `${BURN_WALLET.slice(0,6)}…${BURN_WALLET.slice(-4)}`, c: "#7c3aed" },
+                      ].map(s => (
+                        <div key={s.label} style={{ background: "#1a2440", borderRadius: 10, padding: "10px 14px" }}>
+                          <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{s.label}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: s.c, fontFamily: "'DM Mono',monospace" }}>{s.val}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 10, background: "#1a2440", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: "#475569", marginBottom: 2 }}>Dead Wallet</div>
+                        <a href={`https://explorer.cronos.org/address/${BURN_WALLET}`} target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 11, color: "#ff6b6b", fontFamily: "'DM Mono',monospace", textDecoration: "none" }}>
+                          {BURN_WALLET.slice(0,10)}…{BURN_WALLET.slice(-4)} ↗
+                        </a>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#ff6b6b12", border: "1px solid #ff6b6b33", borderRadius: 99, padding: "4px 10px" }}>
+                        <span style={{ fontSize: 11 }}>🔥</span>
+                        <span style={{ fontSize: 11, color: "#ff6b6b", fontFamily: "'DM Mono',monospace" }}>Live · Cronos RPC</span>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
