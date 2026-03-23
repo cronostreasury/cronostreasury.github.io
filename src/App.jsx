@@ -16,7 +16,7 @@ const STAKED_PACK = {
   symbol: "PACK",
   name: "Pack Token (Staked)",
   label: "PACK (Staked)",
-  amount: 6838646,
+  amount: 1538646,
   address: "0x0d0b4a6FC6e7f5635C2FF38dE75AF2e96D6D6804",
   decimals: 18,
   color: "#E94040",
@@ -61,7 +61,7 @@ function PieChart({ data }) {
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0) return null;
   let angle = -Math.PI / 2;
-  const CX = 100, CY = 100, R = 80, INNER = 48;
+  const CX = 140, CY = 140, R = 80, INNER = 48;
   const slices = data.map(d => {
     const sweep = (d.value / total) * 2 * Math.PI;
     const midAngle = angle + sweep / 2;
@@ -71,14 +71,14 @@ function PieChart({ data }) {
     const x2 = CX + R * Math.cos(angle);
     const y2 = CY + R * Math.sin(angle);
     const lg = sweep > Math.PI ? 1 : 0;
-    const labelR = 96;
+    const labelR = 110;
     const lx = CX + labelR * Math.cos(midAngle);
     const ly = CY + labelR * Math.sin(midAngle);
     const pct = (d.value / total * 100).toFixed(1);
     return { ...d, path: `M${CX},${CY} L${x1},${y1} A${R},${R} 0 ${lg},1 ${x2},${y2} Z`, midAngle, lx, ly, pct, sweep };
   });
   return (
-    <svg viewBox="0 0 200 200" style={{ width: "100%", maxWidth: 260, display: "block", margin: "0 auto" }}>
+    <svg viewBox="0 0 280 280" style={{ width: "100%", maxWidth: 300, display: "block", margin: "0 auto" }}>
       {slices.map((s, i) => (
         <path key={i} d={s.path} fill={s.color} stroke="#06090f" strokeWidth="1.5" />
       ))}
@@ -86,9 +86,9 @@ function PieChart({ data }) {
       <text x={CX} y={CY - 6} textAnchor="middle" fill="#e2e8f0" fontSize="10" fontFamily="monospace" fontWeight="bold">VAULT</text>
       <text x={CX} y={CY + 8} textAnchor="middle" fill="#64ffda" fontSize="8" fontFamily="monospace">TVL</text>
       {slices.map((s, i) => {
-        if (s.sweep < 0.2) return null;
+        if (s.sweep < 0.18) return null;
         const lineStart = 83;
-        const lineEnd = 90;
+        const lineEnd = 98;
         return (
           <g key={"label-" + i}>
             <line
@@ -465,21 +465,25 @@ export default function CTRDashboard() {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            {/* 1. Firesale */}
             <a href="/firesale/" style={{ display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg, #ff3d0018, #ff6d0010)", border: "1px solid #ff3d0044", borderRadius: 99, padding: "4px 12px", textDecoration: "none", animation: "firesalePulse 2s ease-in-out infinite" }}>
               <span style={{ fontSize: 12 }}>🔥</span>
               <span style={{ fontSize: 10, color: "#ff6d00", fontFamily: "'DM Mono',monospace", fontWeight: 700, letterSpacing: ".08em" }}>Firesale</span>
             </a>
-            <a href="https://x.com/CronosTreasury" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="#e2e8f0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.741l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-              <span style={{ fontSize: 10, color: "#e2e8f0", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>@CronosTreasury</span>
+            {/* 2. DeBank */}
+            <a href="https://debank.com/profile/0x96a6cd06338efe754f200aba9ff07788c16e5f20" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff7c1f"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+              <span style={{ fontSize: 10, color: "#ff7c1f", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>DeBank</span>
             </a>
+            {/* 3. Discord */}
             <a href="https://discord.gg/EHUdCuSDAj" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="#7289da"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.031.056a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
               <span style={{ fontSize: 10, color: "#7289da", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>Discord</span>
             </a>
-            <a href="https://debank.com/profile/0x96a6cd06338efe754f200aba9ff07788c16e5f20" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff7c1f"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
-              <span style={{ fontSize: 10, color: "#ff7c1f", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>DeBank</span>
+            {/* 4. X (Twitter) */}
+            <a href="https://x.com/CronosTreasury" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, background: "#0f172a", border: "1px solid #243152", borderRadius: 99, padding: "4px 10px", textDecoration: "none" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#e2e8f0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.741l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+              <span style={{ fontSize: 10, color: "#e2e8f0", fontFamily: "'DM Mono',monospace", letterSpacing: ".08em" }}>@CronosTreasury</span>
             </a>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 13, color: "#64ffda", fontFamily: "'DM Mono',monospace", fontWeight: 600 }}>
