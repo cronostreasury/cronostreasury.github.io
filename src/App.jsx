@@ -33,7 +33,7 @@ const CTR_ADDRESS = "0xF3672F0cF2E45B28AC4a1D50FD8aC2eB555c21FC";
 // ERC-20 Transfer event topic: Transfer(address,address,uint256)
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 // Dead wallet as topic (padded to 32 bytes)
-const DEAD_TOPIC = "0x000000000000000000000000000000000000000000000000000000000000dEaD";
+const DEAD_TOPIC = `0x${BURN_WALLET.toLowerCase().slice(2).padStart(64, "0")}`;
 
 const fmt = (n, dec = 2) => n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const fmtCompact = (n) => n >= 1e6 ? `${(n/1e6).toFixed(2)}M` : n >= 1e3 ? `${(n/1e3).toFixed(1)}K` : n.toFixed(0);
@@ -75,32 +75,80 @@ async function getBlockTimestamp(blockHex) {
   return Date.now();
 }
 
-// Fetch ALL CTR transfers to dead wallet via eth_getLogs
-async function fetchBurnTransfers() {
+async function rpcCall(method, params, id = 1) {
   const res = await fetch(CRONOS_RPC, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      method: "eth_getLogs",
-      params: [{
-        fromBlock: "0x1", // from genesis
-        toBlock: "latest",
-        address: CTR_ADDRESS,
-        topics: [
-          TRANSFER_TOPIC,   // Transfer event
-          null,              // any sender (from)
-          DEAD_TOPIC,        // to = dead wallet
-        ],
-      }],
-      id: 1,
-    }),
+    body: JSON.stringify({ jsonrpc: "2.0", method, params, id }),
   });
   const json = await res.json();
-  if (!json.result || !Array.isArray(json.result)) return [];
+  if (json.error) throw new Error(`${method} failed: ${json.error.message || "unknown RPC error"}`);
+  return json.result;
+}
+
+async function fetchLogsRange(fromBlockHex, toBlockHex, filterDeadWallet = true) {
+  const topics = filterDeadWallet
+    ? [TRANSFER_TOPIC, null, DEAD_TOPIC]
+    : [TRANSFER_TOPIC];
+  return rpcCall("eth_getLogs", [{
+    fromBlock: fromBlockHex,
+    toBlock: toBlockHex,
+    address: CTR_ADDRESS,
+    topics,
+  }]);
+}
+
+// Fetch ALL CTR transfers to dead wallet via eth_getLogs
+async function fetchBurnTransfers() {
+  const normalizeTopic = (topic = "") => topic.toLowerCase();
+  const isDeadWalletTransfer = (log) =>
+    Array.isArray(log?.topics) &&
+    log.topics.length > 2 &&
+    normalizeTopic(log.topics[2]) === normalizeTopic(DEAD_TOPIC);
+
+  const fetchInChunks = async (filterDeadWallet) => {
+    const latestHex = await rpcCall("eth_blockNumber", []);
+    const latest = parseInt(latestHex, 16);
+    const chunkSize = 120000;
+    const chunks = [];
+    for (let from = 1; from <= latest; from += chunkSize) {
+      const to = Math.min(from + chunkSize - 1, latest);
+      const chunkLogs = await fetchLogsRange(`0x${from.toString(16)}`, `0x${to.toString(16)}`, filterDeadWallet);
+      if (Array.isArray(chunkLogs) && chunkLogs.length > 0) {
+        chunks.push(chunkLogs);
+      }
+    }
+    return chunks.flat();
+  };
+
+  let rawLogs = [];
+  try {
+    // Fast path: provider-side filter for to=dead wallet.
+    const singleQueryLogs = await fetchLogsRange("0x1", "latest", true);
+    if (Array.isArray(singleQueryLogs)) {
+      rawLogs = singleQueryLogs;
+    }
+  } catch {
+    // Fallback #1: query in chunks with provider-side dead-wallet filtering.
+    rawLogs = await fetchInChunks(true);
+  }
+
+  // Some RPC providers are unreliable with sparse topics ([topic0, null, topic2]).
+  // If we still have no burns, fetch all Transfer logs and filter locally by topic[2].
+  if (rawLogs.length === 0) {
+    try {
+      const broadLogs = await fetchLogsRange("0x1", "latest", false);
+      rawLogs = Array.isArray(broadLogs) ? broadLogs.filter(isDeadWalletTransfer) : [];
+    } catch {
+      const broadChunkedLogs = await fetchInChunks(false);
+      rawLogs = broadChunkedLogs.filter(isDeadWalletTransfer);
+    }
+  }
+
+  if (!Array.isArray(rawLogs)) return [];
 
   // Parse logs
-  const logs = json.result.map(log => {
+  const logs = rawLogs.map(log => {
     const from = "0x" + log.topics[1].slice(26); // extract address from topic
     const rawAmount = BigInt(log.data);
     const amount = Number(rawAmount) / 1e18; // CTR has 18 decimals
