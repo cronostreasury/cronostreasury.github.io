@@ -25,7 +25,7 @@ const STAKED_PACK = {
   platform: "Wolfswap Vault",
   stakedLabel: "Wolfswap Vault · 38% APY",
   // Set this to the date staking started (YYYY-MM-DD) to calculate accrued yield
-  stakingStartDate: "2025-03-01",
+  stakingStartDate: "2026-03-26",
 };
 
 const TOTAL_SUPPLY = 1_000_000_000;
