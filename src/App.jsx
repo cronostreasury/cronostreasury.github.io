@@ -21,9 +21,9 @@ const STAKED_PACK = {
   decimals: 18,
   color: "#E94040",
   staked: true,
-  apy: 33,
+  apy: 38,
   platform: "Wolfswap Vault",
-  stakedLabel: "Wolfswap Vault · 33% APY",
+  stakedLabel: "Wolfswap Vault · 38% APY",
 };
 
 const TOTAL_SUPPLY = 1_000_000_000;
@@ -849,7 +849,7 @@ export default function CTRDashboard() {
                           <span style={{ fontSize: 11, color: "#64748b" }}>{pct}%</span>
                         </div>
                       </td>
-                      <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#a78bfa" }}>33% APY</td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#a78bfa" }}>38% APY</td>
                       <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#475569" }}>—</td>
                     </tr>
                   );
