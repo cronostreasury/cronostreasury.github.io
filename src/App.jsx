@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 
 const WALLET = "0x96a6cd06338efe754f200aba9ff07788c16e5f20";
-const CRONOS_RPC = "https://evm.cronos.org";
+const CRONOS_RPCS = [
+  "https://evm.cronos.org",
+  "https://cronos-evm.publicnode.com",
+  "https://rpc.vvs.finance",
+];
 
 const TOKENS = [
   { symbol: "CDCBTC", name: "CDC Bitcoin",  address: "0x2e53c5586e12a99d4CAE366E9Fc5C14fE9c6495d", decimals: 8,  color: "#F7931A" },
@@ -51,39 +55,37 @@ const timeAgo = (ts) => {
 // ERC20 balanceOf via eth_call
 async function getTokenBalance(tokenAddress, walletAddress, decimals) {
   const data = "0x70a08231" + walletAddress.slice(2).padStart(64, "0");
-  const res = await fetch(CRONOS_RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", params: [{ to: tokenAddress, data }, "latest"], id: 1 }),
-  });
-  const json = await res.json();
-  const raw = BigInt(json.result || "0x0");
+  const result = await rpcCall("eth_call", [{ to: tokenAddress, data }, "latest"]);
+  const raw = BigInt(result || "0x0");
   return Number(raw) / Math.pow(10, decimals);
 }
 
 // Fetch block timestamp via eth_getBlockByNumber
 async function getBlockTimestamp(blockHex) {
-  const res = await fetch(CRONOS_RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", method: "eth_getBlockByNumber", params: [blockHex, false], id: 1 }),
-  });
-  const json = await res.json();
-  if (json.result && json.result.timestamp) {
-    return Number(BigInt(json.result.timestamp)) * 1000; // ms
+  const result = await rpcCall("eth_getBlockByNumber", [blockHex, false]);
+  if (result && result.timestamp) {
+    return Number(BigInt(result.timestamp)) * 1000; // ms
   }
   return Date.now();
 }
 
 async function rpcCall(method, params, id = 1) {
-  const res = await fetch(CRONOS_RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", method, params, id }),
-  });
-  const json = await res.json();
-  if (json.error) throw new Error(`${method} failed: ${json.error.message || "unknown RPC error"}`);
-  return json.result;
+  let lastError = null;
+  for (const rpcUrl of CRONOS_RPCS) {
+    try {
+      const res = await fetch(rpcUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method, params, id }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message || "unknown RPC error");
+      return json.result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(`${method} failed on all RPC endpoints: ${lastError?.message || "unknown error"}`);
 }
 
 async function fetchLogsRange(fromBlockHex, toBlockHex, filterDeadWallet = true) {
