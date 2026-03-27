@@ -24,6 +24,8 @@ const STAKED_PACK = {
   apy: 38,
   platform: "Wolfswap Vault",
   stakedLabel: "Wolfswap Vault · 38% APY",
+  // Set this to the date staking started (YYYY-MM-DD) to calculate accrued yield
+  stakingStartDate: "2025-03-01",
 };
 
 const TOTAL_SUPPLY = 1_000_000_000;
@@ -32,8 +34,8 @@ const CTR_ADDRESS = "0xF3672F0cF2E45B28AC4a1D50FD8aC2eB555c21FC";
 
 // ERC-20 Transfer event topic: Transfer(address,address,uint256)
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-// Dead wallet as topic (padded to 32 bytes)
-const DEAD_TOPIC = `0x${BURN_WALLET.toLowerCase().slice(2).padStart(64, "0")}`;
+// Dead wallet as topic (padded to 32 bytes) — MUST be lowercase for Cronos RPC
+const DEAD_TOPIC = "0x000000000000000000000000000000000000000000000000000000000000dead";
 
 const fmt = (n, dec = 2) => n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const fmtCompact = (n) => n >= 1e6 ? `${(n/1e6).toFixed(2)}M` : n >= 1e3 ? `${(n/1e3).toFixed(1)}K` : n.toFixed(0);
@@ -75,62 +77,135 @@ async function getBlockTimestamp(blockHex) {
   return Date.now();
 }
 
-async function rpcCall(method, params, id = 1) {
+// Get current block number
+async function getCurrentBlockNumber() {
   const res = await fetch(CRONOS_RPC, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", method, params, id }),
+    body: JSON.stringify({ jsonrpc: "2.0", method: "eth_blockNumber", params: [], id: 1 }),
   });
   const json = await res.json();
-  if (json.error) throw new Error(`${method} failed: ${json.error.message || "unknown RPC error"}`);
-  return json.result;
+  return parseInt(json.result, 16);
 }
 
-async function fetchLogsRange(fromBlockHex, toBlockHex) {
-  return rpcCall("eth_getLogs", [{
-    fromBlock: fromBlockHex,
-    toBlock: toBlockHex,
-    address: CTR_ADDRESS,
-    topics: [
-      TRANSFER_TOPIC, // Transfer event
-      null, // any sender (from)
-      DEAD_TOPIC, // to = dead wallet
-    ],
-  }]);
-}
+// ==========================================
+// DUAL-STRATEGY BURN TRANSFER FETCHING
+// Primary: Cronos Explorer (Blockscout) API
+// Fallback: Chunked eth_getLogs (500k blocks)
+// ==========================================
 
-// Fetch ALL CTR transfers to dead wallet via eth_getLogs
-async function fetchBurnTransfers() {
-  let rawLogs = [];
+// Strategy 1: Cronos Explorer / Blockscout API
+async function fetchBurnTransfersExplorer() {
+  console.log("[Burn Feed] Trying Cronos Explorer API (primary)...");
+  const url = `https://explorer-api.cronos.org/mainnet/api/v2/tokens/${CTR_ADDRESS}/transfers?type=ERC-20&filter=to&value=${BURN_WALLET}`;
+  
+  // The Blockscout API uses a different endpoint pattern — try the tokentx approach
+  const url2 = `https://explorer-api.cronos.org/mainnet/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&address=${BURN_WALLET}&sort=desc`;
+  
+  // Try Blockscout v2 API first
   try {
-    // Fast path: try a single query first.
-    const singleQueryLogs = await fetchLogsRange("0x1", "latest");
-    if (Array.isArray(singleQueryLogs)) {
-      rawLogs = singleQueryLogs;
-    }
-  } catch {
-    // Fallback: query block ranges to avoid provider range limits.
-    const latestHex = await rpcCall("eth_blockNumber", []);
-    const latest = parseInt(latestHex, 16);
-    const chunkSize = 120000;
-    const chunks = [];
-    for (let from = 1; from <= latest; from += chunkSize) {
-      const to = Math.min(from + chunkSize - 1, latest);
-      const chunkLogs = await fetchLogsRange(`0x${from.toString(16)}`, `0x${to.toString(16)}`);
-      if (Array.isArray(chunkLogs) && chunkLogs.length > 0) {
-        chunks.push(chunkLogs);
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.items && data.items.length > 0) {
+        console.log(`[Burn Feed] Explorer v2 API returned ${data.items.length} transfers`);
+        const logs = data.items
+          .filter(item => item.to?.hash?.toLowerCase() === BURN_WALLET.toLowerCase())
+          .map(item => ({
+            txHash: item.tx_hash,
+            blockNumber: item.block_number || parseInt(item.block_hash, 16) || 0,
+            from: (item.from?.hash || "").toLowerCase(),
+            amount: Number(BigInt(item.total?.value || "0")) / 1e18,
+            ts: item.timestamp ? new Date(item.timestamp).getTime() : Date.now(),
+            logIndex: item.log_index || 0,
+          }))
+          .filter(l => l.amount > 0);
+        if (logs.length > 0) return logs;
       }
     }
-    rawLogs = chunks.flat();
+  } catch (e) {
+    console.log("[Burn Feed] Explorer v2 API failed:", e.message);
   }
 
-  if (!Array.isArray(rawLogs)) return [];
+  // Try Blockscout v1 / Etherscan-compatible API
+  try {
+    const res2 = await fetch(url2);
+    if (res2.ok) {
+      const data2 = await res2.json();
+      if (data2.result && Array.isArray(data2.result) && data2.result.length > 0) {
+        console.log(`[Burn Feed] Explorer v1 API returned ${data2.result.length} transfers`);
+        const logs = data2.result
+          .filter(tx => tx.to?.toLowerCase() === BURN_WALLET.toLowerCase())
+          .map(tx => ({
+            txHash: tx.hash,
+            blockNumber: parseInt(tx.blockNumber) || 0,
+            from: (tx.from || "").toLowerCase(),
+            amount: Number(BigInt(tx.value || "0")) / 1e18,
+            ts: tx.timeStamp ? parseInt(tx.timeStamp) * 1000 : Date.now(),
+            logIndex: parseInt(tx.logIndex) || 0,
+          }))
+          .filter(l => l.amount > 0);
+        if (logs.length > 0) return logs;
+      }
+    }
+  } catch (e) {
+    console.log("[Burn Feed] Explorer v1 API failed:", e.message);
+  }
+
+  return null; // Signal to use fallback
+}
+
+// Strategy 2: Chunked eth_getLogs (500k block ranges)
+async function fetchBurnTransfersChunked() {
+  console.log("[Burn Feed] Using chunked eth_getLogs (fallback)...");
+  const currentBlock = await getCurrentBlockNumber();
+  const CHUNK_SIZE = 500_000;
+  const allLogs = [];
+
+  for (let from = 1; from <= currentBlock; from += CHUNK_SIZE) {
+    const to = Math.min(from + CHUNK_SIZE - 1, currentBlock);
+    const fromHex = "0x" + from.toString(16);
+    const toHex = "0x" + to.toString(16);
+
+    try {
+      const res = await fetch(CRONOS_RPC, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "eth_getLogs",
+          params: [{
+            fromBlock: fromHex,
+            toBlock: toHex,
+            address: CTR_ADDRESS,
+            topics: [
+              TRANSFER_TOPIC,  // Transfer event
+              null,             // any sender (from)
+              DEAD_TOPIC,       // to = dead wallet (lowercase!)
+            ],
+          }],
+          id: 1,
+        }),
+      });
+      const json = await res.json();
+      if (json.result && Array.isArray(json.result)) {
+        allLogs.push(...json.result);
+        if (json.result.length > 0) {
+          console.log(`[Burn Feed] Chunk ${fromHex}-${toHex}: found ${json.result.length} burns`);
+        }
+      }
+    } catch (e) {
+      console.log(`[Burn Feed] Chunk ${fromHex}-${toHex} failed:`, e.message);
+    }
+  }
+
+  console.log(`[Burn Feed] eth_getLogs total: ${allLogs.length} burn events`);
 
   // Parse logs
-  const logs = rawLogs.map(log => {
-    const from = "0x" + log.topics[1].slice(26); // extract address from topic
+  const logs = allLogs.map(log => {
+    const from = "0x" + log.topics[1].slice(26);
     const rawAmount = BigInt(log.data);
-    const amount = Number(rawAmount) / 1e18; // CTR has 18 decimals
+    const amount = Number(rawAmount) / 1e18;
     return {
       txHash: log.transactionHash,
       blockNumber: parseInt(log.blockNumber, 16),
@@ -142,6 +217,22 @@ async function fetchBurnTransfers() {
   });
 
   return logs;
+}
+
+// Main fetch function: tries Explorer first, falls back to chunked RPC
+async function fetchBurnTransfers() {
+  // Strategy 1: Cronos Explorer API
+  const explorerResult = await fetchBurnTransfersExplorer();
+  if (explorerResult && explorerResult.length > 0) {
+    console.log(`[Burn Feed] ✅ Using Explorer API — ${explorerResult.length} burn events`);
+    return explorerResult;
+  }
+
+  // Strategy 2: Chunked eth_getLogs
+  console.log("[Burn Feed] Explorer returned nothing, falling back to chunked eth_getLogs...");
+  const rpcResult = await fetchBurnTransfersChunked();
+  console.log(`[Burn Feed] ✅ Using chunked RPC — ${rpcResult.length} burn events`);
+  return rpcResult;
 }
 
 function PieChart({ data }) {
@@ -377,6 +468,7 @@ function BackgroundCanvas() {
 export default function CTRDashboard() {
   const [burnEvents, setBurnEvents] = useState([]);
   const [burnEventsLoading, setBurnEventsLoading] = useState(true);
+  const [burnFetchStrategy, setBurnFetchStrategy] = useState("");
   const [livePrice, setLivePrice] = useState(null);
   const [priceChange24h, setPriceChange24h] = useState(null);
   const [liveMarketCap, setLiveMarketCap] = useState(null);
@@ -389,6 +481,16 @@ export default function CTRDashboard() {
   const packToken = vaultTokens.find(t => t.symbol === "PACK");
   const packUsdPrice = packToken ? packToken.usdPrice : 0;
   const stakedPackUsdValue = STAKED_PACK.amount * packUsdPrice;
+
+  // Calculate accrued PACK yield since staking started
+  const stakingStart = new Date(STAKED_PACK.stakingStartDate + "T00:00:00Z").getTime();
+  const msElapsed = Math.max(0, Date.now() - stakingStart);
+  const daysElapsed = msElapsed / (1000 * 60 * 60 * 24);
+  const dailyRate = STAKED_PACK.apy / 100 / 365;
+  const accruedPack = STAKED_PACK.amount * dailyRate * daysElapsed;
+  const accruedPackUsd = accruedPack * packUsdPrice;
+  const fullDaysElapsed = Math.floor(daysElapsed);
+
   const vaultTotal = vaultTokens.reduce((s, t) => s + t.amount * t.usdPrice, 0) + stakedPackUsdValue;
   const animVault = useCounter(vaultTotal);
   const pieData = [
@@ -490,51 +592,71 @@ export default function CTRDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch ALL burn transfer events (CTR → dead wallet) via eth_getLogs
+  // Fetch ALL burn transfer events (CTR → dead wallet) via dual strategy
   useEffect(() => {
     const fetchEvents = async () => {
       try {
         setBurnEventsLoading(true);
         const logs = await fetchBurnTransfers();
 
-        if (logs.length === 0) {
+        if (!logs || logs.length === 0) {
+          console.log("[Burn Feed] No burn events found from any source");
           setBurnEvents([]);
           setBurnEventsLoading(false);
+          setBurnFetchStrategy("No burns found");
           return;
         }
 
-        // Get unique block numbers to fetch timestamps
-        const uniqueBlocks = [...new Set(logs.map(l => l.blockHex))];
+        // Determine which strategy returned the data
+        // Explorer results have `ts` already set, RPC results have `blockHex`
+        const hasTimestamps = logs.every(l => l.ts && l.ts > 0);
 
-        // Fetch timestamps in batches of 10 to avoid hammering RPC
-        const blockTimestamps = {};
-        const BATCH = 10;
-        for (let i = 0; i < uniqueBlocks.length; i += BATCH) {
-          const batch = uniqueBlocks.slice(i, i + BATCH);
-          const results = await Promise.all(batch.map(bh => getBlockTimestamp(bh)));
-          batch.forEach((bh, idx) => { blockTimestamps[bh] = results[idx]; });
+        if (hasTimestamps) {
+          // Explorer API — timestamps already included
+          setBurnFetchStrategy("Explorer API");
+          const events = logs.map((l, i) => ({
+            id: `${l.txHash}-${l.logIndex || i}`,
+            txHash: l.txHash,
+            from: l.from,
+            amount: l.amount,
+            blockNumber: l.blockNumber,
+            ts: l.ts,
+          })).sort((a, b) => b.ts - a.ts);
+
+          setBurnEvents(events);
+          setBurnEventsLoading(false);
+        } else {
+          // RPC fallback — need to fetch block timestamps
+          setBurnFetchStrategy("RPC (chunked)");
+          const uniqueBlocks = [...new Set(logs.map(l => l.blockHex))];
+          const blockTimestamps = {};
+          const BATCH = 10;
+          for (let i = 0; i < uniqueBlocks.length; i += BATCH) {
+            const batch = uniqueBlocks.slice(i, i + BATCH);
+            const results = await Promise.all(batch.map(bh => getBlockTimestamp(bh)));
+            batch.forEach((bh, idx) => { blockTimestamps[bh] = results[idx]; });
+          }
+
+          const events = logs.map(l => ({
+            id: `${l.txHash}-${l.logIndex}`,
+            txHash: l.txHash,
+            from: l.from,
+            amount: l.amount,
+            blockNumber: l.blockNumber,
+            ts: blockTimestamps[l.blockHex] || Date.now(),
+          })).sort((a, b) => b.ts - a.ts);
+
+          setBurnEvents(events);
+          setBurnEventsLoading(false);
         }
-
-        // Build events with timestamps, sorted newest first
-        const events = logs.map(l => ({
-          id: `${l.txHash}-${l.logIndex}`,
-          txHash: l.txHash,
-          from: l.from,
-          amount: l.amount,
-          blockNumber: l.blockNumber,
-          ts: blockTimestamps[l.blockHex] || Date.now(),
-        })).sort((a, b) => b.ts - a.ts);
-
-        setBurnEvents(events);
-        setBurnEventsLoading(false);
       } catch (e) {
         console.log("Burn events fetch error:", e);
         setBurnEventsLoading(false);
+        setBurnFetchStrategy("Error");
       }
     };
 
     fetchEvents();
-    // Refresh every 2 minutes
     const interval = setInterval(fetchEvents, 120000);
     return () => clearInterval(interval);
   }, []);
@@ -724,15 +846,36 @@ export default function CTRDashboard() {
                       const val = stakedPackUsdValue;
                       const pct = vaultTotal > 0 ? (val / vaultTotal * 100).toFixed(1) : "0.0";
                       return (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, background: "#1a1030", borderRadius: 8, padding: "6px 8px", border: "1px solid #3d1a6e55" }}>
-                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: STAKED_PACK.color, flexShrink: 0 }} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, color: "#cbd5e1" }}>PACK <span style={{ fontSize: 10, color: "#a78bfa", background: "#3d1a6e55", borderRadius: 4, padding: "1px 5px", marginLeft: 4 }}>Staked</span></div>
-                            <div style={{ fontSize: 10, color: "#6b4fa0", fontFamily: "'DM Mono',monospace" }}>🔒 {STAKED_PACK.stakedLabel}</div>
+                        <div style={{ background: "#1a1030", borderRadius: 8, padding: "6px 8px", border: "1px solid #3d1a6e55", marginBottom: 10 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: STAKED_PACK.color, flexShrink: 0 }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, color: "#cbd5e1" }}>PACK <span style={{ fontSize: 10, color: "#a78bfa", background: "#3d1a6e55", borderRadius: 4, padding: "1px 5px", marginLeft: 4 }}>Staked</span></div>
+                              <div style={{ fontSize: 10, color: "#6b4fa0", fontFamily: "'DM Mono',monospace" }}>🔒 {STAKED_PACK.stakedLabel}</div>
+                            </div>
+                            <div style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>{fmtCompact(STAKED_PACK.amount)}</div>
+                            <div style={{ fontSize: 12, color: "#64ffda", fontFamily: "'DM Mono',monospace", width: 70, textAlign: "right" }}>${fmtCompact(val)}</div>
+                            <div style={{ fontSize: 11, color: "#475569", width: 36, textAlign: "right" }}>{pct}%</div>
                           </div>
-                          <div style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>{fmtCompact(STAKED_PACK.amount)}</div>
-                          <div style={{ fontSize: 12, color: "#64ffda", fontFamily: "'DM Mono',monospace", width: 70, textAlign: "right" }}>${fmtCompact(val)}</div>
-                          <div style={{ fontSize: 11, color: "#475569", width: 36, textAlign: "right" }}>{pct}%</div>
+                          {accruedPack > 0 && (
+                            <div style={{ marginTop: 6, marginLeft: 16, padding: "5px 10px", background: "#0d1a0d", borderRadius: 6, border: "1px solid #1a3a1a", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                <span style={{ fontSize: 11 }}>🌱</span>
+                                <span style={{ fontSize: 10, color: "#475569" }}>Yield ({fullDaysElapsed}d):</span>
+                              </div>
+                              <span style={{ fontSize: 12, color: "#64ffda", fontFamily: "'DM Mono',monospace", fontWeight: 600 }}>
+                                +{fmtCompact(accruedPack)} PACK
+                              </span>
+                              {accruedPackUsd > 0 && (
+                                <span style={{ fontSize: 11, color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>
+                                  ≈ ${fmtCompact(accruedPackUsd)}
+                                </span>
+                              )}
+                              <span style={{ fontSize: 10, color: "#475569", fontFamily: "'DM Mono',monospace" }}>
+                                (~{fmtCompact(STAKED_PACK.amount * dailyRate)}/day)
+                              </span>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -855,6 +998,7 @@ export default function CTRDashboard() {
                 {stakedPackUsdValue > 0 && (() => {
                   const pct = vaultTotal > 0 ? (stakedPackUsdValue / vaultTotal * 100).toFixed(1) : "0.0";
                   return (
+                    <>
                     <tr style={{ background: "#1a1030" }}>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -879,6 +1023,30 @@ export default function CTRDashboard() {
                       <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#a78bfa" }}>38% APY</td>
                       <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#475569" }}>—</td>
                     </tr>
+                    {accruedPack > 0 && (
+                      <tr style={{ background: "#0d1a0d" }}>
+                        <td colSpan={7} style={{ padding: "8px 16px", borderBottom: "1px solid #1a3a1a" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                              <span style={{ fontSize: 12 }}>🌱</span>
+                              <span style={{ fontSize: 11, color: "#64748b" }}>Accrued yield ({fullDaysElapsed} days):</span>
+                            </div>
+                            <span style={{ fontSize: 13, color: "#64ffda", fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>
+                              +{fmtCompact(accruedPack)} PACK
+                            </span>
+                            {accruedPackUsd > 0 && (
+                              <span style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>
+                                ≈ ${fmtCompact(accruedPackUsd)}
+                              </span>
+                            )}
+                            <span style={{ fontSize: 10, color: "#475569", fontFamily: "'DM Mono',monospace" }}>
+                              ~{fmtCompact(STAKED_PACK.amount * dailyRate)} PACK/day
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </>
                   );
                 })()}
               </tbody>
@@ -990,6 +1158,11 @@ export default function CTRDashboard() {
               {burnEvents.length > 0 && (
                 <div style={{ fontSize: 11, color: "#ff6b6b", fontFamily: "'DM Mono',monospace", background: "#ff6b6b12", border: "1px solid #ff6b6b33", borderRadius: 8, padding: "4px 10px" }}>
                   {burnEvents.length} burn{burnEvents.length !== 1 ? "s" : ""}
+                </div>
+              )}
+              {burnFetchStrategy && (
+                <div style={{ fontSize: 10, color: "#475569", fontFamily: "'DM Mono',monospace", background: "#0f172a", border: "1px solid #1e293b", borderRadius: 8, padding: "3px 8px" }}>
+                  via {burnFetchStrategy}
                 </div>
               )}
               <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#ff6b6b12", border: "1px solid #ff6b6b33", borderRadius: 99, padding: "4px 12px" }}>
