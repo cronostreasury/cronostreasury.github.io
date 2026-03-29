@@ -24,17 +24,25 @@ const STAKED_PACK = {
   apy: 38,
   platform: "Wolfswap Vault",
   stakedLabel: "Wolfswap Vault · 38% APY",
-  // Set this to the date staking started (YYYY-MM-DD) to calculate accrued yield
   stakingStartDate: "2026-03-26",
+};
+
+// Wolfie NFTs — 10 held, floor price 1200 CRO each
+const WOLFIE_NFTS = {
+  name: "Wolfie NFTs",
+  symbol: "WOLFIE",
+  count: 10,
+  floorPriceCRO: 1200,
+  color: "#f59e0b",
 };
 
 const TOTAL_SUPPLY = 1_000_000_000;
 const BURN_WALLET = "0x000000000000000000000000000000000000dEaD";
 const CTR_ADDRESS = "0xF3672F0cF2E45B28AC4a1D50FD8aC2eB555c21FC";
 
-// ERC-20 Transfer event topic: Transfer(address,address,uint256)
+// ERC-20 Transfer event topic
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-// Dead wallet as topic (padded to 32 bytes) — MUST be lowercase for Cronos RPC
+// Dead wallet as topic (padded, lowercase — required for Cronos RPC)
 const DEAD_TOPIC = "0x000000000000000000000000000000000000000000000000000000000000dead";
 
 const fmt = (n, dec = 2) => n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
@@ -63,7 +71,7 @@ async function getTokenBalance(tokenAddress, walletAddress, decimals) {
   return Number(raw) / Math.pow(10, decimals);
 }
 
-// Fetch block timestamp via eth_getBlockByNumber
+// Fetch block timestamp
 async function getBlockTimestamp(blockHex) {
   const res = await fetch(CRONOS_RPC, {
     method: "POST",
@@ -72,7 +80,7 @@ async function getBlockTimestamp(blockHex) {
   });
   const json = await res.json();
   if (json.result && json.result.timestamp) {
-    return Number(BigInt(json.result.timestamp)) * 1000; // ms
+    return Number(BigInt(json.result.timestamp)) * 1000;
   }
   return Date.now();
 }
@@ -90,69 +98,54 @@ async function getCurrentBlockNumber() {
 
 // ==========================================
 // DUAL-STRATEGY BURN TRANSFER FETCHING
-// Primary: Cronos Explorer (Blockscout) API
+// Primary:  cronos.org/explorer/api (Blockscout v1 / Etherscan-compatible)
 // Fallback: Chunked eth_getLogs (500k blocks)
 // ==========================================
 
-// Strategy 1: Cronos Explorer / Blockscout API
 async function fetchBurnTransfersExplorer() {
   console.log("[Burn Feed] Trying Cronos Explorer API (primary)...");
-  const url = `https://explorer-api.cronos.org/mainnet/api/v2/tokens/${CTR_ADDRESS}/transfers?type=ERC-20&filter=to&value=${BURN_WALLET}`;
-  
-  // The Blockscout API uses a different endpoint pattern — try the tokentx approach
-  const url2 = `https://explorer-api.cronos.org/mainnet/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&address=${BURN_WALLET}&sort=desc`;
-  
-  // Try Blockscout v2 API first
+
+  // Correct Blockscout / Etherscan-compatible endpoint for Cronos
+  const url = `https://cronos.org/explorer/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&address=${BURN_WALLET}&sort=desc&limit=500`;
+
   try {
     const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.items && data.items.length > 0) {
-        console.log(`[Burn Feed] Explorer v2 API returned ${data.items.length} transfers`);
-        const logs = data.items
-          .filter(item => item.to?.hash?.toLowerCase() === BURN_WALLET.toLowerCase())
-          .map(item => ({
-            txHash: item.tx_hash,
-            blockNumber: item.block_number || parseInt(item.block_hash, 16) || 0,
-            from: (item.from?.hash || "").toLowerCase(),
-            amount: Number(BigInt(item.total?.value || "0")) / 1e18,
-            ts: item.timestamp ? new Date(item.timestamp).getTime() : Date.now(),
-            logIndex: item.log_index || 0,
-          }))
-          .filter(l => l.amount > 0);
-        if (logs.length > 0) return logs;
+    if (!res.ok) {
+      console.log(`[Burn Feed] Explorer API HTTP ${res.status}`);
+      return null;
+    }
+    const data = await res.json();
+    console.log("[Burn Feed] Explorer API response status:", data.status, "count:", data.result?.length);
+
+    if (data.status === "1" && Array.isArray(data.result) && data.result.length > 0) {
+      const logs = data.result
+        .filter(tx => tx.to?.toLowerCase() === BURN_WALLET.toLowerCase())
+        .map(tx => ({
+          txHash: tx.hash,
+          blockNumber: parseInt(tx.blockNumber) || 0,
+          from: (tx.from || "").toLowerCase(),
+          amount: Number(BigInt(tx.value || "0")) / 1e18,
+          ts: tx.timeStamp ? parseInt(tx.timeStamp) * 1000 : Date.now(),
+          logIndex: parseInt(tx.logIndex) || 0,
+        }))
+        .filter(l => l.amount > 0);
+
+      if (logs.length > 0) {
+        console.log(`[Burn Feed] ✅ Explorer API returned ${logs.length} burns`);
+        return logs;
       }
     }
-  } catch (e) {
-    console.log("[Burn Feed] Explorer v2 API failed:", e.message);
-  }
 
-  // Try Blockscout v1 / Etherscan-compatible API
-  try {
-    const res2 = await fetch(url2);
-    if (res2.ok) {
-      const data2 = await res2.json();
-      if (data2.result && Array.isArray(data2.result) && data2.result.length > 0) {
-        console.log(`[Burn Feed] Explorer v1 API returned ${data2.result.length} transfers`);
-        const logs = data2.result
-          .filter(tx => tx.to?.toLowerCase() === BURN_WALLET.toLowerCase())
-          .map(tx => ({
-            txHash: tx.hash,
-            blockNumber: parseInt(tx.blockNumber) || 0,
-            from: (tx.from || "").toLowerCase(),
-            amount: Number(BigInt(tx.value || "0")) / 1e18,
-            ts: tx.timeStamp ? parseInt(tx.timeStamp) * 1000 : Date.now(),
-            logIndex: parseInt(tx.logIndex) || 0,
-          }))
-          .filter(l => l.amount > 0);
-        if (logs.length > 0) return logs;
-      }
+    // status "0" with message "No transactions found" is valid — means no burns yet
+    if (data.status === "0") {
+      console.log("[Burn Feed] Explorer API: no transactions found (status 0)");
+      return []; // empty but successful — don't fall through to RPC
     }
   } catch (e) {
-    console.log("[Burn Feed] Explorer v1 API failed:", e.message);
+    console.log("[Burn Feed] Explorer API exception:", e.message);
   }
 
-  return null; // Signal to use fallback
+  return null; // null = try fallback
 }
 
 // Strategy 2: Chunked eth_getLogs (500k block ranges)
@@ -179,9 +172,9 @@ async function fetchBurnTransfersChunked() {
             toBlock: toHex,
             address: CTR_ADDRESS,
             topics: [
-              TRANSFER_TOPIC,  // Transfer event
-              null,             // any sender (from)
-              DEAD_TOPIC,       // to = dead wallet (lowercase!)
+              TRANSFER_TOPIC,
+              null,
+              DEAD_TOPIC,
             ],
           }],
           id: 1,
@@ -201,7 +194,6 @@ async function fetchBurnTransfersChunked() {
 
   console.log(`[Burn Feed] eth_getLogs total: ${allLogs.length} burn events`);
 
-  // Parse logs
   const logs = allLogs.map(log => {
     const from = "0x" + log.topics[1].slice(26);
     const rawAmount = BigInt(log.data);
@@ -219,20 +211,20 @@ async function fetchBurnTransfersChunked() {
   return logs;
 }
 
-// Main fetch function: tries Explorer first, falls back to chunked RPC
+// Main fetch: Explorer first, chunked RPC fallback
 async function fetchBurnTransfers() {
-  // Strategy 1: Cronos Explorer API
   const explorerResult = await fetchBurnTransfersExplorer();
-  if (explorerResult && explorerResult.length > 0) {
+
+  // null = API failed (try fallback). [] = API succeeded but 0 burns (don't fall through)
+  if (explorerResult !== null) {
     console.log(`[Burn Feed] ✅ Using Explorer API — ${explorerResult.length} burn events`);
-    return explorerResult;
+    return { logs: explorerResult, strategy: "Explorer API" };
   }
 
-  // Strategy 2: Chunked eth_getLogs
-  console.log("[Burn Feed] Explorer returned nothing, falling back to chunked eth_getLogs...");
+  console.log("[Burn Feed] Explorer unreachable, falling back to chunked eth_getLogs...");
   const rpcResult = await fetchBurnTransfersChunked();
   console.log(`[Burn Feed] ✅ Using chunked RPC — ${rpcResult.length} burn events`);
-  return rpcResult;
+  return { logs: rpcResult, strategy: "RPC (chunked)" };
 }
 
 function PieChart({ data }) {
@@ -303,7 +295,6 @@ function useCounter(target, duration = 1200) {
   }, [target]);
   return val;
 }
-
 
 function BackgroundCanvas() {
   const canvasRef = useRef(null);
@@ -477,10 +468,14 @@ export default function CTRDashboard() {
   const [treasuryHistory, setTreasuryHistory] = useState([]);
   const [burnedAmount, setBurnedAmount] = useState(0);
   const [burnLoading, setBurnLoading] = useState(true);
+  const [croPrice, setCroPrice] = useState(0); // for Wolfie NFT valuation
 
   const packToken = vaultTokens.find(t => t.symbol === "PACK");
   const packUsdPrice = packToken ? packToken.usdPrice : 0;
   const stakedPackUsdValue = STAKED_PACK.amount * packUsdPrice;
+
+  // Wolfie NFT USD value based on live CRO price
+  const wolfieUsdValue = WOLFIE_NFTS.count * WOLFIE_NFTS.floorPriceCRO * croPrice;
 
   // Calculate accrued PACK yield since staking started
   const stakingStart = new Date(STAKED_PACK.stakingStartDate + "T00:00:00Z").getTime();
@@ -491,11 +486,13 @@ export default function CTRDashboard() {
   const accruedPackUsd = accruedPack * packUsdPrice;
   const fullDaysElapsed = Math.floor(daysElapsed);
 
-  const vaultTotal = vaultTokens.reduce((s, t) => s + t.amount * t.usdPrice, 0) + stakedPackUsdValue;
+  const vaultTotal = vaultTokens.reduce((s, t) => s + t.amount * t.usdPrice, 0) + stakedPackUsdValue + wolfieUsdValue;
   const animVault = useCounter(vaultTotal);
+
   const pieData = [
     ...vaultTokens.filter(t => t.symbol !== "CTR" && t.amount * t.usdPrice > 0).map(t => ({ symbol: t.symbol, value: t.amount * t.usdPrice, color: t.color })),
     ...(stakedPackUsdValue > 0 ? [{ symbol: "PACK*", value: stakedPackUsdValue, color: "#ff4444" }] : []),
+    ...(wolfieUsdValue > 0 ? [{ symbol: "WOLFIE", value: wolfieUsdValue, color: WOLFIE_NFTS.color }] : []),
   ];
 
   // Fetch CTR price from DexScreener
@@ -517,7 +514,7 @@ export default function CTRDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch wallet balances + prices
+  // Fetch wallet balances + prices (also grabs CRO price for Wolfie valuation)
   useEffect(() => {
     const fetchVault = async () => {
       try {
@@ -542,6 +539,35 @@ export default function CTRDashboard() {
             };
           }
         });
+
+        // Fetch CRO price via WCRO token on DexScreener
+        try {
+          const WCRO = "0x5C7F8A570d578ED84E63fdFA7b1eE72dEae1AE23";
+          const croRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${WCRO}`);
+          const croData = await croRes.json();
+          // Pick the pair with highest liquidity
+          let bestCroPrice = 0;
+          let bestLiq = 0;
+          (croData.pairs || []).forEach(pair => {
+            const p = parseFloat(pair.priceUsd);
+            const liq = parseFloat(pair.liquidity?.usd || 0);
+            if (!isNaN(p) && p > 0 && liq > bestLiq) {
+              bestCroPrice = p;
+              bestLiq = liq;
+            }
+          });
+          if (bestCroPrice > 0) {
+            setCroPrice(bestCroPrice);
+            console.log(`[CRO Price] WCRO → $${bestCroPrice}`);
+          } else {
+            // Fallback: LCRO ≈ CRO
+            const lcroAddr = "0x9fae23a2700feecd5b93e43fdbc03c76aa7c08a6";
+            if (priceMap[lcroAddr]) setCroPrice(priceMap[lcroAddr].price);
+          }
+        } catch {
+          const lcroAddr = "0x9fae23a2700feecd5b93e43fdbc03c76aa7c08a6";
+          if (priceMap[lcroAddr]) setCroPrice(priceMap[lcroAddr].price);
+        }
 
         const updated = TOKENS.map((t, i) => {
           let usdPrice = 0;
@@ -592,28 +618,26 @@ export default function CTRDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch ALL burn transfer events (CTR → dead wallet) via dual strategy
+  // Fetch ALL burn transfer events via dual strategy
   useEffect(() => {
     const fetchEvents = async () => {
       try {
         setBurnEventsLoading(true);
-        const logs = await fetchBurnTransfers();
+        const { logs, strategy } = await fetchBurnTransfers();
+        setBurnFetchStrategy(strategy);
 
         if (!logs || logs.length === 0) {
           console.log("[Burn Feed] No burn events found from any source");
           setBurnEvents([]);
           setBurnEventsLoading(false);
-          setBurnFetchStrategy("No burns found");
           return;
         }
 
-        // Determine which strategy returned the data
-        // Explorer results have `ts` already set, RPC results have `blockHex`
+        // Explorer results have `ts` set; RPC results have `blockHex`
         const hasTimestamps = logs.every(l => l.ts && l.ts > 0);
 
         if (hasTimestamps) {
           // Explorer API — timestamps already included
-          setBurnFetchStrategy("Explorer API");
           const events = logs.map((l, i) => ({
             id: `${l.txHash}-${l.logIndex || i}`,
             txHash: l.txHash,
@@ -626,8 +650,7 @@ export default function CTRDashboard() {
           setBurnEvents(events);
           setBurnEventsLoading(false);
         } else {
-          // RPC fallback — need to fetch block timestamps
-          setBurnFetchStrategy("RPC (chunked)");
+          // RPC fallback — fetch block timestamps
           const uniqueBlocks = [...new Set(logs.map(l => l.blockHex))];
           const blockTimestamps = {};
           const BATCH = 10;
@@ -665,7 +688,6 @@ export default function CTRDashboard() {
   const changeColor = displayChange >= 0 ? "#64ffda" : "#ff6b6b";
   const changePrefix = displayChange >= 0 ? "+" : "";
 
-  // Total burned from events (for the feed summary)
   const totalBurnedFromEvents = burnEvents.reduce((s, e) => s + e.amount, 0);
 
   return (
@@ -700,7 +722,7 @@ export default function CTRDashboard() {
       `}</style>
 
       {/* Header */}
-      <header style={{ borderBottom: "1px solid #243152", background: "#06090f", padding: "0 16px", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", background: "rgba(5, 8, 18, 0.92)" }}>
+      <header style={{ borderBottom: "1px solid #243152", padding: "0 16px", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", background: "rgba(5, 8, 18, 0.92)" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56, gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             <img src="/Logo1.jpg" alt="CTR Logo" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
@@ -773,7 +795,6 @@ export default function CTRDashboard() {
             </div>
             <div style={{ width: "1px", height: 20, background: "#1e3a2a" }} />
             <span style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>Trade on Obsidian Finance</span>
-
             <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <span style={{ fontSize: 11, color: "#64ffda", fontFamily: "'DM Mono',monospace" }}>obsidian.finance</span>
               <span style={{ fontSize: 12, color: "#64ffda" }}>↗</span>
@@ -842,6 +863,7 @@ export default function CTRDashboard() {
                         </div>
                       );
                     })}
+                    {/* Staked PACK */}
                     {stakedPackUsdValue > 0 && (() => {
                       const val = stakedPackUsdValue;
                       const pct = vaultTotal > 0 ? (val / vaultTotal * 100).toFixed(1) : "0.0";
@@ -876,6 +898,24 @@ export default function CTRDashboard() {
                               </span>
                             </div>
                           )}
+                        </div>
+                      );
+                    })()}
+                    {/* Wolfie NFTs */}
+                    {wolfieUsdValue > 0 && (() => {
+                      const pct = vaultTotal > 0 ? (wolfieUsdValue / vaultTotal * 100).toFixed(1) : "0.0";
+                      return (
+                        <div style={{ background: "#1a1500", borderRadius: 8, padding: "6px 8px", border: "1px solid #f59e0b33", marginBottom: 10 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: WOLFIE_NFTS.color, flexShrink: 0 }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, color: "#cbd5e1" }}>Wolfie NFTs <span style={{ fontSize: 10, color: "#f59e0b", background: "#f59e0b22", borderRadius: 4, padding: "1px 5px", marginLeft: 4 }}>NFT</span></div>
+                              <div style={{ fontSize: 10, color: "#b07d1a", fontFamily: "'DM Mono',monospace" }}>🐺 {WOLFIE_NFTS.count}× · Floor {fmtCompact(WOLFIE_NFTS.floorPriceCRO)} CRO each</div>
+                            </div>
+                            <div style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>{WOLFIE_NFTS.count} NFTs</div>
+                            <div style={{ fontSize: 12, color: "#64ffda", fontFamily: "'DM Mono',monospace", width: 70, textAlign: "right" }}>${fmtCompact(wolfieUsdValue)}</div>
+                            <div style={{ fontSize: 11, color: "#475569", width: 36, textAlign: "right" }}>{pct}%</div>
+                          </div>
                         </div>
                       );
                     })()}
@@ -995,6 +1035,7 @@ export default function CTRDashboard() {
                     </tr>
                   );
                 })}
+                {/* Staked PACK row */}
                 {stakedPackUsdValue > 0 && (() => {
                   const pct = vaultTotal > 0 ? (stakedPackUsdValue / vaultTotal * 100).toFixed(1) : "0.0";
                   return (
@@ -1047,6 +1088,41 @@ export default function CTRDashboard() {
                       </tr>
                     )}
                     </>
+                  );
+                })()}
+                {/* Wolfie NFT row */}
+                {(() => {
+                  const pct = vaultTotal > 0 ? (wolfieUsdValue / vaultTotal * 100).toFixed(1) : "0.0";
+                  return (
+                    <tr style={{ background: "#1a1500" }}>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#f59e0b22", border: "2px solid #f59e0b55", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🐺</div>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>Wolfie NFTs <span style={{ fontSize: 10, color: "#f59e0b", background: "#f59e0b22", borderRadius: 4, padding: "1px 5px", marginLeft: 4 }}>NFT</span></div>
+                            <div style={{ fontSize: 10, color: "#b07d1a" }}>Floor {fmtCompact(WOLFIE_NFTS.floorPriceCRO)} CRO · {WOLFIE_NFTS.count} held</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", color: "#e2e8f0" }}>{WOLFIE_NFTS.count} NFTs</td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", color: "#94a3b8" }}>
+                        {croPrice > 0 ? `${fmtCompact(WOLFIE_NFTS.floorPriceCRO)} CRO` : "—"}
+                        {croPrice > 0 && <div style={{ fontSize: 10, color: "#475569" }}>(≈ ${fmtPrice(WOLFIE_NFTS.floorPriceCRO * croPrice)})</div>}
+                      </td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", color: "#64ffda", fontWeight: 600 }}>
+                        {croPrice > 0 ? `$${fmtCompact(wolfieUsdValue)}` : `${fmtCompact(WOLFIE_NFTS.count * WOLFIE_NFTS.floorPriceCRO)} CRO`}
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ width: 60, background: "#1e293b", borderRadius: 99, height: 4, overflow: "hidden" }}>
+                            <div style={{ width: `${Math.min(parseFloat(pct), 100)}%`, height: "100%", background: "#f59e0b", borderRadius: 99 }} />
+                          </div>
+                          <span style={{ fontSize: 11, color: "#64748b" }}>{pct}%</span>
+                        </div>
+                      </td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#f59e0b" }}>Floor price</td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#475569" }}>—</td>
+                    </tr>
                   );
                 })()}
               </tbody>
@@ -1147,7 +1223,7 @@ export default function CTRDashboard() {
           </div>
         </div>
 
-        {/* ========== BURN TRANSFER FEED (on-chain) ========== */}
+        {/* BURN TRANSFER FEED */}
         <div className="section-card">
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #243152", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
@@ -1172,7 +1248,6 @@ export default function CTRDashboard() {
             </div>
           </div>
           <div style={{ padding: "0 0 8px" }}>
-            {/* Table header */}
             <div className="burn-feed-row" style={{ borderBottom: "1px solid #243152" }}>
               <div style={{ fontSize: 10, color: "#475569", letterSpacing: ".1em", textTransform: "uppercase" }}>Time</div>
               <div className="from-col" style={{ fontSize: 10, color: "#475569", letterSpacing: ".1em", textTransform: "uppercase" }}>From</div>
@@ -1188,12 +1263,11 @@ export default function CTRDashboard() {
             ) : burnEvents.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 20px", color: "#475569", fontSize: 13 }}>
                 <div style={{ fontSize: 28, marginBottom: 12 }}>🔥</div>
-                <div style={{ color: "#64748b", fontFamily: "'DM Mono',monospace" }}>No burn transactions found</div>
+                <div style={{ color: "#64748b", fontFamily: "'DM Mono',monospace" }}>No burn transactions found yet</div>
                 <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>CTR transfers to the dead wallet will appear here automatically</div>
               </div>
             ) : (
               <>
-                {/* Summary bar */}
                 <div style={{ padding: "10px 16px", background: "#1a0a0a", borderBottom: "1px solid #3d1515", display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
                   <div>
                     <span style={{ fontSize: 10, color: "#475569", marginRight: 6 }}>TOTAL BURNED:</span>
@@ -1208,8 +1282,6 @@ export default function CTRDashboard() {
                     <span style={{ fontSize: 13, color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>{timeAgo(burnEvents[0].ts)}</span>
                   </div>
                 </div>
-
-                {/* Scrollable rows */}
                 <div style={{ maxHeight: 400, overflowY: "auto" }}>
                   {burnEvents.map(e => (
                     <div key={e.id} className="burn-feed-row">
@@ -1219,7 +1291,7 @@ export default function CTRDashboard() {
                       </div>
                       <div className="from-col">
                         <a href={`https://explorer.cronos.org/address/${e.from}`} target="_blank" rel="noopener noreferrer"
-                          style={{ color: "#7c3aed", fontFamily: "'DM Mono',monospace", textDecoration: "none", fontSize: 12 }}>
+                          style={{ color: "#7c3aed", fontFamily: "'DM Mono fontFamily", textDecoration: "none", fontSize: 12 }}>
                           {truncAddr(e.from)} ↗
                         </a>
                       </div>
