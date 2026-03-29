@@ -44,7 +44,6 @@
   }
   @keyframes firePulse { 0% { opacity:.6; transform:scale(1); } 100% { opacity:1; transform:scale(1.05); } }
 
-  /* Ember particles */
   .ember {
     position: absolute; border-radius: 50%; pointer-events: none;
     filter: blur(1px); animation: emberRise linear infinite; opacity: 0;
@@ -55,7 +54,6 @@
     100% { opacity:0; transform:translateY(-110vh) scale(0) rotate(360deg); }
   }
 
-  /* Flame lick animations on sides */
   .flame-lick {
     position: fixed; bottom: -20px; width: 60px; height: 120px; z-index: 1; pointer-events: none;
     background: radial-gradient(ellipse at bottom, #ff3d0066 0%, #ff6d0033 30%, transparent 70%);
@@ -75,7 +73,6 @@
     100% { transform: scaleY(0.8) scaleX(1.1); opacity: 0.4; }
   }
 
-  /* Floating fire sparks */
   .spark {
     position: fixed; width: 3px; height: 3px; border-radius: 50%; pointer-events: none; z-index: 1;
     animation: sparkFloat linear infinite;
@@ -94,7 +91,6 @@
 
   .container { position: relative; z-index: 2; max-width: 900px; margin: 0 auto; padding: 0 16px 60px; }
 
-  /* === TOP NAV === */
   .topnav {
     position: sticky; top: 0; z-index: 100;
     background: #0a0e1aee; backdrop-filter: blur(12px);
@@ -116,7 +112,6 @@
   .topnav-link.active { border-color: var(--fire-orange); color: var(--fire-orange); background: #ff3d0011; }
   @media (max-width: 500px) { .topnav-links .hide-mobile { display: none; } }
 
-  /* === HEADER WITH WOLF === */
   .header { text-align: center; padding: 40px 0 20px; }
   .header-badge {
     display: inline-flex; align-items: center; gap: 8px;
@@ -137,7 +132,6 @@
   .header .sub { font-size: 13px; color: var(--text-secondary); max-width: 500px; margin: 0 auto; line-height: 1.6; }
   .header .sub strong { color: var(--fire-orange); }
 
-  /* Wolf mascot — centered above title, flame replaces emoji */
   .wolf-mascot {
     width: 140px; height: 140px;
     margin: 0 auto 0;
@@ -164,7 +158,6 @@
     .wolf-mascot { width: 110px; height: 110px; }
   }
 
-  /* === COUNTDOWN === */
   .countdown-section { margin: 30px 0; text-align: center; }
   .countdown-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .2em; margin-bottom: 14px; }
   .countdown-grid { display: flex; justify-content: center; gap: 12px; }
@@ -206,7 +199,6 @@
   .winner-card .wc-bid { font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 16px; margin-top: 6px; }
   .winner-card .wc-none { font-size: 12px; color: var(--text-muted); }
 
-  /* === PRICE CARD === */
   .price-card {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
     padding: 24px; margin: 24px 0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;
@@ -222,7 +214,6 @@
   .price-item .change.down { color: var(--danger); }
   @media (max-width: 500px) { .price-card { grid-template-columns: 1fr; gap: 14px; } }
 
-  /* === LOTS === */
   .lots-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; text-align: center; margin: 36px 0 8px; }
   .lots-subtitle { text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 24px; }
   .lots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 30px; }
@@ -245,7 +236,6 @@
   .lot-card.locked { opacity: 0.45; cursor: not-allowed; }
   .lot-card.locked:hover { transform: none; box-shadow: none; border-color: var(--border); }
 
-  /* === BID SECTION === */
   .bid-section {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
     padding: 28px; position: relative; overflow: hidden;
@@ -289,14 +279,12 @@
   .btn-bid::after { content:''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, #ffffff22, transparent); transform: translateX(-100%); animation: shimmer 3s ease-in-out infinite; }
   @keyframes shimmer { 0% { transform: translateX(-100%); } 60%,100% { transform: translateX(100%); } }
 
-  /* === TOAST === */
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: #1e293b; border: 1px solid var(--border); border-radius: 12px; padding: 14px 24px; font-size: 13px; z-index: 1000; transition: transform .4s cubic-bezier(.16,1,.3,1); max-width: 90vw; text-align: center; }
   .toast.show { transform: translateX(-50%) translateY(0); }
   .toast.success { border-color: #00e67644; color: var(--success); }
   .toast.error { border-color: #ff174444; color: var(--danger); }
   .toast.info { border-color: #64ffda44; color: var(--accent-cyan); }
 
-  /* === BIDS TABLE === */
   .bids-section { margin-top: 30px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
   .bids-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   .bids-header h3 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; }
@@ -308,7 +296,6 @@
   .bids-table tr:hover td { background: #0f172a; }
   .bids-empty { text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px; }
 
-  /* === RULES === */
   .rules-section { margin-top: 30px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
   .rules-section h3 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
   .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -316,7 +303,6 @@
   .rule-item { background: #0a0e1a; border: 1px solid #1a2744; border-radius: 10px; padding: 16px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
   .rule-item .num { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 18px; color: var(--fire-orange); margin-bottom: 6px; }
 
-  /* === SETTLEMENT BOX === */
   .settlement-box {
     margin-top: 30px; background: linear-gradient(135deg, #0c1220, #111a2e);
     border: 1px solid var(--fire-orange); border-radius: 14px; padding: 28px;
@@ -345,7 +331,6 @@
   }
   .settlement-link:hover { color: var(--fire-orange); }
 
-  /* === FOOTER === */
   .footer { text-align: center; margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); line-height: 2; }
   .footer a { color: var(--text-secondary); text-decoration: none; }
   .footer a:hover { color: var(--fire-orange); }
@@ -358,7 +343,6 @@
   .warning-box { background: #ff174412; border: 1px solid #ff174433; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: var(--danger); margin-bottom: 16px; display: none; }
   .warning-box.show { display: block; }
 
-  /* === AUCTION === */
   .auction-info { margin-bottom: 20px; }
   .auction-lot-name { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; margin-bottom: 14px; color: var(--fire-orange); }
   .auction-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
@@ -378,7 +362,6 @@
 <body>
 
 <div class="fire-bg" id="fireBg"></div>
-<!-- Flame licks at bottom -->
 <div class="flame-lick"></div>
 <div class="flame-lick"></div>
 <div class="flame-lick"></div>
@@ -414,7 +397,6 @@
   <div class="header">
     <div class="header-badge"><span class="dot"></span> Firesale Active</div>
 
-    <!-- Wolf mascot — his flame IS the fire icon -->
     <div class="wolf-mascot">
       <div class="wolf-glow"></div>
       <img src="/firesale/wolf-fire.png" alt="" onerror="this.parentElement.style.display='none'">
@@ -475,7 +457,6 @@
     </div>
     <div class="warning-box" id="warningBox">⚠️ Insufficient CRO balance for this bid.</div>
 
-    <!-- Auction info for selected lot -->
     <div class="auction-info" id="auctionInfo" style="display:none">
       <div class="auction-lot-name" id="auctionLotName">--</div>
       <div class="auction-row">
@@ -487,15 +468,15 @@
         <div class="auction-stat">
           <div class="auction-stat-label">Minimum Bid</div>
           <div class="auction-stat-value fire" id="auctionMinBid">--</div>
-          <div class="auction-stat-sub">Starting price or +50 CRO</div>
+          <div class="auction-stat-sub" id="auctionMinBidSub">Starting price or outbid</div>
         </div>
       </div>
       <div class="auction-your-bid">
         <div class="auction-bid-label">Your Bid (CRO)</div>
         <div class="auction-bid-row">
-          <button class="qty-btn" onclick="adjustBid(-50)">−50</button>
+          <button class="qty-btn" id="btnBidDown" onclick="adjustBid(-1)">−</button>
           <div class="auction-bid-input" id="yourBidDisplay">--</div>
-          <button class="qty-btn" onclick="adjustBid(50)">+50</button>
+          <button class="qty-btn" id="btnBidUp" onclick="adjustBid(1)">+</button>
         </div>
         <div class="auction-bid-sub" id="bidCtrAmount">≈ -- CTR</div>
       </div>
@@ -530,13 +511,12 @@
     <h3>📜 How It Works</h3>
     <div class="rules-grid">
       <div class="rule-item"><div class="num">01</div>Connect your Cronos wallet. Only CTR holders can participate (Open lots available for new holders).</div>
-      <div class="rule-item"><div class="num">02</div>Each lot is a single auction. Select a lot and outbid the current highest bidder by at least 50 CRO.</div>
+      <div class="rule-item"><div class="num">02</div>Each lot is a single auction. Select a lot and outbid the current highest bidder by the minimum increment for that tier.</div>
       <div class="rule-item"><div class="num">03</div>Auction is live every Friday 00:00 UTC → Sunday 00:00 UTC (48h). Highest bidder wins.</div>
       <div class="rule-item"><div class="num">04</div>Winners send CRO (bid amount) to the Treasury wallet. CTR is sent to your wallet after payment.</div>
     </div>
   </div>
 
-  <!-- SETTLEMENT INFO -->
   <div class="settlement-box">
     <div class="settlement-icon">💰</div>
     <h3>Won an auction? Here's how to claim your CTR</h3>
@@ -589,7 +569,6 @@ function toast(msg,type='info'){const t=$('toast');t.textContent=msg;t.className
 // ===================== PARTICLES =====================
 function spawnEmbers(){
   const bg=$('fireBg');
-  // Large embers
   for(let i=0;i<20;i++){
     const e=document.createElement('div');
     e.className='ember';
@@ -603,7 +582,6 @@ function spawnEmbers(){
     e.style.background=colors[Math.floor(Math.random()*colors.length)];
     bg.appendChild(e);
   }
-  // Tiny sparks
   for(let i=0;i<12;i++){
     const s=document.createElement('div');
     s.className='spark';
@@ -619,16 +597,20 @@ function spawnEmbers(){
   }
 }
 
-// Wolf is now a CSS background element — no JS needed
+// ===================== BID STEP PER LOT TIER =====================
+function getBidStep(lotId) {
+  const lot = LOTS.find(l => l.id === lotId);
+  if (!lot) return 50;
+  if (lot.minHold === 0) return 5;            // Open lots: 5 CRO
+  if (lot.minHold <= 1_000_000) return 10;    // Enjoyer: 10 CRO
+  if (lot.minHold <= 10_000_000) return 20;   // Whale: 20 CRO
+  return 50;                                   // Titan & Legend: 50 CRO
+}
 
 // ===================== AUCTION STATE =====================
-// Friday 00:00 UTC → Sunday 00:00 UTC = LIVE (48h)
-// Sunday 00:00 UTC → Friday 00:00 UTC = CLOSED (shows winners)
-// Countdown always counts to next Friday 00:00 UTC
-
 function getAuctionState() {
   const now = new Date();
-  const day = now.getUTCDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
+  const day = now.getUTCDay();
   if (day === 5 || day === 6) return 'live';
   return 'closed';
 }
@@ -637,21 +619,20 @@ function getNextFridayStart() {
   const now = new Date();
   const day = now.getUTCDay();
   let daysUntilFri = (5 - day + 7) % 7;
-  if (daysUntilFri === 0) daysUntilFri = 7; // If Friday, show next Friday
-  if (day === 6) daysUntilFri = 6; // Saturday → next Friday = 6 days
+  if (daysUntilFri === 0) daysUntilFri = 7;
+  if (day === 6) daysUntilFri = 6;
   const t = new Date(now);
   t.setUTCDate(t.getUTCDate() + daysUntilFri);
   return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 0, 0, 0));
 }
 
 function getAuctionEndTime() {
-  // End = Sunday 00:00 UTC of current week
   const now = new Date();
   const day = now.getUTCDay();
   let daysUntilSun;
   if (day === 5) daysUntilSun = 2;
   else if (day === 6) daysUntilSun = 1;
-  else return null; // not live
+  else return null;
   const t = new Date(now);
   t.setUTCDate(t.getUTCDate() + daysUntilSun);
   return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 0, 0, 0));
@@ -684,7 +665,6 @@ function updCD() {
     $('liveBanner').style.display = 'none';
     $('closedBanner').style.display = 'block';
 
-    // Only re-render winners when bids change
     const hash = JSON.stringify(S.bids.map(b=>b.lotId+getBidAmount(b)));
     if (hash !== _lastWinnersHash) { renderWinners(); _lastWinnersHash = hash; }
 
@@ -730,8 +710,6 @@ async function fetchBal(){if(!S.wallet)return;try{const b=await window.ethereum.
   try{const data='0x70a08231'+S.wallet.slice(2).padStart(64,'0');const r=await window.ethereum.request({method:'eth_call',params:[{to:CTR_TOKEN,data},'latest']});S.ctrBalance=parseInt(r,16)/Math.pow(10,CTR_DECIMALS);}catch(e){console.error('CTR balance error:',e);S.ctrBalance=0;}}
 function renderWallet(){const c=!!S.wallet;$('btnConnect').style.display=c?'none':'inline-flex';$('btnDisconnect').style.display=c?'inline-flex':'none';$('walletInfo').style.display=c?'flex':'none';if(c){$('walletAddr').textContent=trunc(S.wallet);$('walletBal').textContent=fmt(S.croBalance,2)+' CRO · '+fmtC(S.ctrBalance)+' CTR';}chkBal();renderLots();}
 
-const BID_STEP = 50; // CRO increment
-
 // Get the highest bid for a given lot
 function getHighBid(lotId) {
   const validLot = LOTS.find(l => l.id === lotId);
@@ -754,7 +732,7 @@ function getMinBid(lotId) {
     const usd = lot.amount * S.ctrPrice;
     return S.croPrice > 0 ? Math.ceil(usd / S.croPrice) : 0;
   }
-  return getBidAmount(high) + BID_STEP;
+  return getBidAmount(high) + getBidStep(lotId);
 }
 
 // ===================== LOTS =====================
@@ -765,6 +743,7 @@ function renderLots(){
     const cro=S.croPrice>0?usd/S.croPrice:0;
     const isUnlocked=!S.wallet||S.ctrBalance>=l.minHold;
     const high=getHighBid(l.id);
+    const step=getBidStep(l.id);
     const c=document.createElement('div');
     c.className=`lot-card${S.selectedLot===l.id?' selected':''}${!isUnlocked&&S.wallet?' locked':''}`;
     c.onclick=()=>{
@@ -779,7 +758,7 @@ function renderLots(){
     const reqText = l.minHold === 0
       ? `${S.wallet?'🔓 ':''} Open to all wallets`
       : `${S.wallet&&!isUnlocked?'🔒':S.wallet?'🔓':''} Hold ${fmtC(l.minHold)} CTR`;
-    c.innerHTML=`<div class="lot-tag ${l.tag}">${l.tagLabel}</div><div class="lot-amount">${fmtC(l.amount)}</div><div class="lot-token">CTR Tokens</div><div class="lot-price">${cro>0?fmtC(cro)+' CRO':'...'}<span class="usd">(≈ $${usd>0?fmtC(usd):'...'})</span></div>${highBidHtml}<div class="lot-req">${reqText}</div>`;
+    c.innerHTML=`<div class="lot-tag ${l.tag}">${l.tagLabel}</div><div class="lot-amount">${fmtC(l.amount)}</div><div class="lot-token">CTR Tokens</div><div class="lot-price">${cro>0?fmtC(cro)+' CRO':'...'}<span class="usd">(≈ $${usd>0?fmtC(usd):'...'})</span></div>${highBidHtml}<div class="lot-req">${reqText}</div><div style="font-size:9px;color:var(--text-muted);margin-top:4px">Min increment: ${step} CRO</div>`;
     g.appendChild(c);
   });
 }
@@ -806,6 +785,7 @@ function updAuction(){
 
   const high=getHighBid(l.id);
   const minBid=getMinBid(l.id);
+  const step=getBidStep(l.id);
 
   if(high){
     $('auctionHighBid').textContent=fmt(getBidAmount(high),0)+' CRO';
@@ -815,6 +795,11 @@ function updAuction(){
     $('auctionHighBidder').textContent='Be the first!';
   }
   $('auctionMinBid').textContent=minBid>0?fmt(minBid,0)+' CRO':'...';
+  $('auctionMinBidSub').textContent=`Starting price or +${step} CRO`;
+
+  // Update +/- button labels to show step size
+  $('btnBidDown').textContent=`−${step}`;
+  $('btnBidUp').textContent=`+${step}`;
 
   if(!S.yourBid||S.yourBid<minBid) S.yourBid=minBid;
   $('yourBidDisplay').textContent=S.yourBid>0?fmt(S.yourBid,0)+' CRO':'...';
@@ -828,10 +813,11 @@ function updAuction(){
   updBtn();
 }
 
-function adjustBid(delta){
+function adjustBid(direction){
   if(!S.selectedLot)return;
+  const step=getBidStep(S.selectedLot);
   const minBid=getMinBid(S.selectedLot);
-  S.yourBid=Math.max(minBid,(S.yourBid||minBid)+delta);
+  S.yourBid=Math.max(minBid,(S.yourBid||minBid)+(direction*step));
   updAuction();
   chkBal();
 }
@@ -864,7 +850,7 @@ function renderBids(){
   $('bidsEmpty').style.display='none';$('bidsTable').style.display='table';
   $('bidsTbody').innerHTML=[...S.bids].reverse().slice(0,30).map(b=>{
     const lot=LOTS.find(l=>l.id===b.lotId);
-    if(!lot) return ''; // skip old bids with removed lot IDs
+    if(!lot) return '';
     const highBid=getHighBid(b.lotId);
     const isHigh=highBid&&highBid.timestamp===b.timestamp&&highBid.wallet===b.wallet;
     return `<tr style="${isHigh?'background:#ff3d0008':''}"><td>${lot.label}</td><td style="color:var(--accent-cyan)">${trunc(b.wallet)}${isHigh?' 👑':''}</td><td style="color:var(--fire-orange);font-weight:600">${fmt(getBidAmount(b),0)} CRO</td><td>${fmtC(lot.amount)} CTR</td><td style="color:var(--text-muted)">${tAgo(b.timestamp)}</td></tr>`;
@@ -881,17 +867,14 @@ async function placeBid(){
   const l=LOTS.find(x=>x.id===S.selectedLot);
   const minBid=getMinBid(l.id);
 
-  // Refresh balances
   await fetchBal();
   renderWallet();
 
-  // Check CTR holding
   if(S.ctrBalance<l.minHold){
     toast(`You need at least ${fmtC(l.minHold)} CTR to bid on this lot.`,'error');
     S.selectedLot=null;renderLots();updAuction();return;
   }
 
-  // Check bid >= minimum
   if(S.yourBid<minBid){
     S.yourBid=minBid;
     updAuction();
@@ -899,13 +882,11 @@ async function placeBid(){
     return;
   }
 
-  // Check CRO balance
   if(S.croBalance<S.yourBid){
     toast(`Insufficient CRO. Need ${fmt(S.yourBid,0)} but have ${fmt(S.croBalance,2)}.`,'error');
     return;
   }
 
-  // Check if user already has highest bid on this lot
   const high=getHighBid(l.id);
   if(high&&high.wallet.toLowerCase()===S.wallet.toLowerCase()){
     toast('You already have the highest bid on this lot!','info');
@@ -954,3 +935,5 @@ document.addEventListener('DOMContentLoaded',init);
 </script>
 </body>
 </html>
+ENDOFFILE
+echo "File written successfully, size: $(wc -c < /mnt/user-data/outputs/index.html) bytes"
