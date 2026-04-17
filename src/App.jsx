@@ -27,6 +27,16 @@ const STAKED_PACK = {
   stakingStartDate: "2026-03-26",
 };
 
+// VVS Finance CTR/PACK LP — donated by community member Bill
+const LP_POSITION = {
+  pairAddress: "0x81B3807137d0e7872Bb73Cc080C5452cf1beDAEB",
+  name: "CTR/PACK LP",
+  platform: "VVS Finance",
+  donor: "Bill",
+  color: "#00d2ff",
+  decimals: 18,
+};
+
 // Wolfie NFTs — 10 held, floor price 1200 CRO each
 const WOLFIE_NFTS = {
   name: "Wolfie NFTs",
@@ -71,6 +81,71 @@ async function getTokenBalance(tokenAddress, walletAddress, decimals) {
   return Number(raw) / Math.pow(10, decimals);
 }
 
+// Generic eth_call helper (returns raw hex result)
+async function ethCall(to, data) {
+  const res = await fetch(CRONOS_RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", params: [{ to, data }, "latest"], id: 1 }),
+  });
+  const json = await res.json();
+  return json.result || "0x0";
+}
+
+// Fetch LP position data: balance, reserves, totalSupply, token0
+async function fetchLPData(pairAddress, walletAddress) {
+  try {
+    const [balanceHex, reservesHex, totalSupplyHex, token0Hex] = await Promise.all([
+      ethCall(pairAddress, "0x70a08231" + walletAddress.slice(2).padStart(64, "0")),  // balanceOf
+      ethCall(pairAddress, "0x0902f1ac"),  // getReserves
+      ethCall(pairAddress, "0x18160ddd"),  // totalSupply
+      ethCall(pairAddress, "0x0dfe1681"),  // token0
+    ]);
+
+    const lpBalance = Number(BigInt(balanceHex)) / 1e18;
+    const lpTotalSupply = Number(BigInt(totalSupplyHex)) / 1e18;
+
+    // getReserves returns: uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast
+    // reserve0 = bytes 0-31 (offset 2+0 to 2+64), reserve1 = bytes 32-63
+    const cleanReserves = reservesHex.slice(2); // remove 0x
+    const reserve0Raw = BigInt("0x" + cleanReserves.slice(0, 64));
+    const reserve1Raw = BigInt("0x" + cleanReserves.slice(64, 128));
+
+    // token0 returns an address (last 20 bytes of 32-byte word)
+    const token0Address = "0x" + token0Hex.slice(26).toLowerCase();
+
+    const isCTRToken0 = token0Address === CTR_ADDRESS.toLowerCase();
+
+    // Both CTR and PACK are 18 decimals
+    const reserve0 = Number(reserve0Raw) / 1e18;
+    const reserve1 = Number(reserve1Raw) / 1e18;
+
+    const reserveCTR = isCTRToken0 ? reserve0 : reserve1;
+    const reservePACK = isCTRToken0 ? reserve1 : reserve0;
+
+    const shareOfPool = lpTotalSupply > 0 ? lpBalance / lpTotalSupply : 0;
+
+    console.log(`[LP] Balance: ${lpBalance.toFixed(4)} LP tokens`);
+    console.log(`[LP] Total Supply: ${lpTotalSupply.toFixed(4)}`);
+    console.log(`[LP] Share: ${(shareOfPool * 100).toFixed(4)}%`);
+    console.log(`[LP] Token0: ${token0Address} (${isCTRToken0 ? "CTR" : "PACK"})`);
+    console.log(`[LP] Reserves: ${reserveCTR.toFixed(2)} CTR / ${reservePACK.toFixed(2)} PACK`);
+
+    return {
+      lpBalance,
+      lpTotalSupply,
+      shareOfPool,
+      reserveCTR,
+      reservePACK,
+      treasuryCTR: reserveCTR * shareOfPool,
+      treasuryPACK: reservePACK * shareOfPool,
+    };
+  } catch (e) {
+    console.log("[LP] Fetch error:", e.message);
+    return null;
+  }
+}
+
 // Fetch block timestamp
 async function getBlockTimestamp(blockHex) {
   const res = await fetch(CRONOS_RPC, {
@@ -105,7 +180,6 @@ async function getCurrentBlockNumber() {
 async function fetchBurnTransfersExplorer() {
   console.log("[Burn Feed] Trying Cronos Explorer API (primary)...");
 
-  // Correct Blockscout / Etherscan-compatible endpoint for Cronos
   const url = `https://cronos.org/explorer/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&address=${BURN_WALLET}&sort=desc&limit=500`;
 
   try {
@@ -136,19 +210,17 @@ async function fetchBurnTransfersExplorer() {
       }
     }
 
-    // status "0" with message "No transactions found" is valid — means no burns yet
     if (data.status === "0") {
       console.log("[Burn Feed] Explorer API: no transactions found (status 0)");
-      return []; // empty but successful — don't fall through to RPC
+      return [];
     }
   } catch (e) {
     console.log("[Burn Feed] Explorer API exception:", e.message);
   }
 
-  return null; // null = try fallback
+  return null;
 }
 
-// Strategy 2: Chunked eth_getLogs (500k block ranges)
 async function fetchBurnTransfersChunked() {
   console.log("[Burn Feed] Using chunked eth_getLogs (fallback)...");
   const currentBlock = await getCurrentBlockNumber();
@@ -211,11 +283,9 @@ async function fetchBurnTransfersChunked() {
   return logs;
 }
 
-// Main fetch: Explorer first, chunked RPC fallback
 async function fetchBurnTransfers() {
   const explorerResult = await fetchBurnTransfersExplorer();
 
-  // null = API failed (try fallback). [] = API succeeded but 0 burns (don't fall through)
   if (explorerResult !== null) {
     console.log(`[Burn Feed] ✅ Using Explorer API — ${explorerResult.length} burn events`);
     return { logs: explorerResult, strategy: "Explorer API" };
@@ -468,11 +538,21 @@ export default function CTRDashboard() {
   const [treasuryHistory, setTreasuryHistory] = useState([]);
   const [burnedAmount, setBurnedAmount] = useState(0);
   const [burnLoading, setBurnLoading] = useState(true);
-  const [croPrice, setCroPrice] = useState(0); // for Wolfie NFT valuation
+  const [croPrice, setCroPrice] = useState(0);
+  const [lpData, setLpData] = useState(null); // LP position data
 
   const packToken = vaultTokens.find(t => t.symbol === "PACK");
   const packUsdPrice = packToken ? packToken.usdPrice : 0;
   const stakedPackUsdValue = STAKED_PACK.amount * packUsdPrice;
+
+  // CTR price for LP valuation (from live price or vault tokens)
+  const ctrToken = vaultTokens.find(t => t.symbol === "CTR");
+  const ctrUsdPrice = livePrice || (ctrToken ? ctrToken.usdPrice : 0);
+
+  // LP USD value
+  const lpUsdValue = lpData
+    ? (lpData.treasuryCTR * ctrUsdPrice) + (lpData.treasuryPACK * packUsdPrice)
+    : 0;
 
   // Wolfie NFT USD value based on live CRO price
   const wolfieUsdValue = WOLFIE_NFTS.count * WOLFIE_NFTS.floorPriceCRO * croPrice;
@@ -486,12 +566,13 @@ export default function CTRDashboard() {
   const accruedPackUsd = accruedPack * packUsdPrice;
   const fullDaysElapsed = Math.floor(daysElapsed);
 
-  const vaultTotal = vaultTokens.reduce((s, t) => s + t.amount * t.usdPrice, 0) + stakedPackUsdValue + wolfieUsdValue;
+  const vaultTotal = vaultTokens.reduce((s, t) => s + t.amount * t.usdPrice, 0) + stakedPackUsdValue + wolfieUsdValue + lpUsdValue;
   const animVault = useCounter(vaultTotal);
 
   const pieData = [
     ...vaultTokens.filter(t => t.symbol !== "CTR" && t.amount * t.usdPrice > 0).map(t => ({ symbol: t.symbol, value: t.amount * t.usdPrice, color: t.color })),
     ...(stakedPackUsdValue > 0 ? [{ symbol: "PACK*", value: stakedPackUsdValue, color: "#ff4444" }] : []),
+    ...(lpUsdValue > 0 ? [{ symbol: "LP", value: lpUsdValue, color: LP_POSITION.color }] : []),
     ...(wolfieUsdValue > 0 ? [{ symbol: "WOLFIE", value: wolfieUsdValue, color: WOLFIE_NFTS.color }] : []),
   ];
 
@@ -514,13 +595,20 @@ export default function CTRDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch wallet balances + prices (also grabs CRO price for Wolfie valuation)
+  // Fetch wallet balances + prices + LP data
   useEffect(() => {
     const fetchVault = async () => {
       try {
-        const balances = await Promise.all(
-          TOKENS.map(t => getTokenBalance(t.address, WALLET, t.decimals))
-        );
+        // Fetch token balances and LP data in parallel
+        const [balances, lpResult] = await Promise.all([
+          Promise.all(TOKENS.map(t => getTokenBalance(t.address, WALLET, t.decimals))),
+          fetchLPData(LP_POSITION.pairAddress, WALLET),
+        ]);
+
+        if (lpResult) {
+          setLpData(lpResult);
+          console.log(`[LP] ✅ USD value components: ${lpResult.treasuryCTR.toFixed(2)} CTR + ${lpResult.treasuryPACK.toFixed(2)} PACK`);
+        }
 
         const dexRes = await fetch("https://api.dexscreener.com/latest/dex/tokens/0x2e53c5586e12a99d4CAE366E9Fc5C14fE9c6495d,0x7a7c9db510aB29A2FC362a4c34260BEcB5cE3446,0x9Fae23A2700FEeCd5b93e43fDBc03c76AA7C08A6,0x0d0b4a6FC6e7f5635C2FF38dE75AF2e96D6D6804,0xF3672F0cF2E45B28AC4a1D50FD8aC2eB555c21FC");
         const dexData = await dexRes.json();
@@ -545,7 +633,6 @@ export default function CTRDashboard() {
           const WCRO = "0x5C7F8A570d578ED84E63fdFA7b1eE72dEae1AE23";
           const croRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${WCRO}`);
           const croData = await croRes.json();
-          // Pick the pair with highest liquidity
           let bestCroPrice = 0;
           let bestLiq = 0;
           (croData.pairs || []).forEach(pair => {
@@ -560,7 +647,6 @@ export default function CTRDashboard() {
             setCroPrice(bestCroPrice);
             console.log(`[CRO Price] WCRO → $${bestCroPrice}`);
           } else {
-            // Fallback: LCRO ≈ CRO
             const lcroAddr = "0x9fae23a2700feecd5b93e43fdbc03c76aa7c08a6";
             if (priceMap[lcroAddr]) setCroPrice(priceMap[lcroAddr].price);
           }
@@ -633,11 +719,9 @@ export default function CTRDashboard() {
           return;
         }
 
-        // Explorer results have `ts` set; RPC results have `blockHex`
         const hasTimestamps = logs.every(l => l.ts && l.ts > 0);
 
         if (hasTimestamps) {
-          // Explorer API — timestamps already included
           const events = logs.map((l, i) => ({
             id: `${l.txHash}-${l.logIndex || i}`,
             txHash: l.txHash,
@@ -650,7 +734,6 @@ export default function CTRDashboard() {
           setBurnEvents(events);
           setBurnEventsLoading(false);
         } else {
-          // RPC fallback — fetch block timestamps
           const uniqueBlocks = [...new Set(logs.map(l => l.blockHex))];
           const blockTimestamps = {};
           const BATCH = 10;
@@ -901,6 +984,37 @@ export default function CTRDashboard() {
                         </div>
                       );
                     })()}
+                    {/* CTR/PACK LP Position */}
+                    {lpData && lpUsdValue > 0 && (() => {
+                      const pct = vaultTotal > 0 ? (lpUsdValue / vaultTotal * 100).toFixed(1) : "0.0";
+                      return (
+                        <div style={{ background: "#0a1a2a", borderRadius: 8, padding: "6px 8px", border: "1px solid #00d2ff33", marginBottom: 10 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: LP_POSITION.color, flexShrink: 0 }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, color: "#cbd5e1" }}>CTR/PACK <span style={{ fontSize: 10, color: "#00d2ff", background: "#00d2ff22", borderRadius: 4, padding: "1px 5px", marginLeft: 4 }}>LP</span></div>
+                              <div style={{ fontSize: 10, color: "#4a9ec0", fontFamily: "'DM Mono',monospace" }}>🤝 {LP_POSITION.platform} · Donated by {LP_POSITION.donor}</div>
+                            </div>
+                            <div style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>{(lpData.shareOfPool * 100).toFixed(2)}%</div>
+                            <div style={{ fontSize: 12, color: "#64ffda", fontFamily: "'DM Mono',monospace", width: 70, textAlign: "right" }}>${fmtCompact(lpUsdValue)}</div>
+                            <div style={{ fontSize: 11, color: "#475569", width: 36, textAlign: "right" }}>{pct}%</div>
+                          </div>
+                          <div style={{ marginTop: 6, marginLeft: 16, padding: "5px 10px", background: "#0a1520", borderRadius: 6, border: "1px solid #1a2a3a", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <span style={{ fontSize: 11 }}>💧</span>
+                              <span style={{ fontSize: 10, color: "#475569" }}>Pool share:</span>
+                            </div>
+                            <span style={{ fontSize: 11, color: "#64ffda", fontFamily: "'DM Mono',monospace" }}>
+                              {fmtCompact(lpData.treasuryCTR)} CTR
+                            </span>
+                            <span style={{ fontSize: 11, color: "#475569" }}>+</span>
+                            <span style={{ fontSize: 11, color: "#E94040", fontFamily: "'DM Mono',monospace" }}>
+                              {fmtCompact(lpData.treasuryPACK)} PACK
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {/* Wolfie NFTs */}
                     {wolfieUsdValue > 0 && (() => {
                       const pct = vaultTotal > 0 ? (wolfieUsdValue / vaultTotal * 100).toFixed(1) : "0.0";
@@ -1087,6 +1201,44 @@ export default function CTRDashboard() {
                         </td>
                       </tr>
                     )}
+                    </>
+                  );
+                })()}
+                {/* CTR/PACK LP row */}
+                {lpData && lpUsdValue > 0 && (() => {
+                  const pct = vaultTotal > 0 ? (lpUsdValue / vaultTotal * 100).toFixed(1) : "0.0";
+                  return (
+                    <>
+                    <tr style={{ background: "#0a1a2a" }}>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#00d2ff22", border: "2px solid #00d2ff55", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0 }}>💧</div>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>CTR / PACK <span style={{ fontSize: 10, color: "#00d2ff", background: "#00d2ff22", borderRadius: 4, padding: "1px 5px", marginLeft: 4 }}>LP</span></div>
+                            <div style={{ fontSize: 10, color: "#4a9ec0" }}>🤝 {LP_POSITION.platform} · Donated by {LP_POSITION.donor}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", color: "#e2e8f0" }}>
+                        <div>{fmtCompact(lpData.lpBalance)} LP</div>
+                        <div style={{ fontSize: 10, color: "#475569" }}>{(lpData.shareOfPool * 100).toFixed(2)}% of pool</div>
+                      </td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", color: "#94a3b8", fontSize: 11 }}>
+                        <div>{fmtCompact(lpData.treasuryCTR)} CTR</div>
+                        <div>{fmtCompact(lpData.treasuryPACK)} PACK</div>
+                      </td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", color: "#64ffda", fontWeight: 600 }}>${fmtCompact(lpUsdValue)}</td>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ width: 60, background: "#1e293b", borderRadius: 99, height: 4, overflow: "hidden" }}>
+                            <div style={{ width: `${Math.min(parseFloat(pct), 100)}%`, height: "100%", background: "#00d2ff", borderRadius: 99 }} />
+                          </div>
+                          <span style={{ fontSize: 11, color: "#64748b" }}>{pct}%</span>
+                        </div>
+                      </td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#00d2ff" }}>LP fees</td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#475569" }}>—</td>
+                    </tr>
                     </>
                   );
                 })()}
@@ -1291,7 +1443,7 @@ export default function CTRDashboard() {
                       </div>
                       <div className="from-col">
                         <a href={`https://explorer.cronos.org/address/${e.from}`} target="_blank" rel="noopener noreferrer"
-                          style={{ color: "#7c3aed", fontFamily: "'DM Mono fontFamily", textDecoration: "none", fontSize: 12 }}>
+                          style={{ color: "#7c3aed", fontFamily: "'DM Mono',monospace", textDecoration: "none", fontSize: 12 }}>
                           {truncAddr(e.from)} ↗
                         </a>
                       </div>
