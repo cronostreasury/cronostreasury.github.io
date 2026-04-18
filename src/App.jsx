@@ -230,21 +230,32 @@ async function getCurrentBlockNumber() {
 // ==========================================
 
 async function fetchBurnTransfersExplorer() {
-  console.log("[Burn Feed] Trying Cronos Explorer API (primary)...");
+  console.log("[Burn Feed] Fetching via Cronos Explorer API (paginated)...");
+  const allLogs = [];
+  const MAX_PAGES = 20;
+  const OFFSET = 1000; // Blockscout uses 'offset' as page size (not 'limit')
 
-  const url = `https://cronos.org/explorer/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&address=${BURN_WALLET}&sort=desc&limit=500`;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = `https://cronos.org/explorer/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&address=${BURN_WALLET}&sort=desc&page=${page}&offset=${OFFSET}`;
 
-  try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.log(`[Burn Feed] Explorer API HTTP ${res.status}`);
-      return null;
-    }
-    const data = await res.json();
-    console.log("[Burn Feed] Explorer API response status:", data.status, "count:", data.result?.length);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.log(`[Burn Feed] Explorer page ${page} HTTP ${res.status}`);
+        break;
+      }
+      const data = await res.json();
 
-    if (data.status === "1" && Array.isArray(data.result) && data.result.length > 0) {
-      const logs = data.result
+      if (data.status !== "1" || !Array.isArray(data.result)) {
+        if (page === 1) {
+          console.log("[Burn Feed] Explorer API: no transactions on first page (status:", data.status, ")");
+          return [];
+        }
+        break;
+      }
+
+      const rawCount = data.result.length;
+      const pageLogs = data.result
         .filter(tx => tx.to?.toLowerCase() === BURN_WALLET.toLowerCase())
         .map(tx => ({
           txHash: tx.hash,
@@ -256,21 +267,19 @@ async function fetchBurnTransfersExplorer() {
         }))
         .filter(l => l.amount > 0);
 
-      if (logs.length > 0) {
-        console.log(`[Burn Feed] ✅ Explorer API returned ${logs.length} burns`);
-        return logs;
-      }
-    }
+      allLogs.push(...pageLogs);
+      console.log(`[Burn Feed] Explorer page ${page}: ${pageLogs.length} burns (${rawCount} raw tx)`);
 
-    if (data.status === "0") {
-      console.log("[Burn Feed] Explorer API: no transactions found (status 0)");
-      return [];
+      // Stop if this page was not full (no more pages)
+      if (rawCount < OFFSET) break;
+    } catch (e) {
+      console.log(`[Burn Feed] Explorer page ${page} exception:`, e.message);
+      break;
     }
-  } catch (e) {
-    console.log("[Burn Feed] Explorer API exception:", e.message);
   }
 
-  return null;
+  console.log(`[Burn Feed] Explorer total: ${allLogs.length} burn events`);
+  return allLogs;
 }
 
 async function fetchBurnTransfersChunked() {
@@ -336,17 +345,59 @@ async function fetchBurnTransfersChunked() {
 }
 
 async function fetchBurnTransfers() {
-  const explorerResult = await fetchBurnTransfersExplorer();
+  console.log("[Burn Feed] Fetching from Explorer API and Cronos RPC in parallel...");
 
-  if (explorerResult !== null) {
-    console.log(`[Burn Feed] ✅ Using Explorer API — ${explorerResult.length} burn events`);
-    return { logs: explorerResult, strategy: "Explorer API" };
+  const [explorerLogs, rpcLogs] = await Promise.all([
+    fetchBurnTransfersExplorer().catch(e => {
+      console.log("[Burn Feed] Explorer failed:", e.message);
+      return [];
+    }),
+    fetchBurnTransfersChunked().catch(e => {
+      console.log("[Burn Feed] RPC failed:", e.message);
+      return [];
+    }),
+  ]);
+
+  console.log(`[Burn Feed] Explorer: ${explorerLogs.length} | RPC: ${rpcLogs.length}`);
+
+  // Merge and deduplicate by txHash + logIndex
+  const map = new Map();
+
+  // Add RPC logs first (they have reliable logIndex and are closer to blockchain truth)
+  for (const log of rpcLogs) {
+    const key = `${log.txHash.toLowerCase()}-${log.logIndex}`;
+    map.set(key, log);
   }
 
-  console.log("[Burn Feed] Explorer unreachable, falling back to chunked eth_getLogs...");
-  const rpcResult = await fetchBurnTransfersChunked();
-  console.log(`[Burn Feed] ✅ Using chunked RPC — ${rpcResult.length} burn events`);
-  return { logs: rpcResult, strategy: "RPC (chunked)" };
+  // Overlay Explorer logs — add new ones, enrich existing RPC logs with timestamps
+  const explorerKeys = new Set();
+  for (const log of explorerLogs) {
+    const key = `${log.txHash.toLowerCase()}-${log.logIndex}`;
+    explorerKeys.add(key);
+    if (!map.has(key)) {
+      map.set(key, log);
+    } else {
+      const existing = map.get(key);
+      if (!existing.ts && log.ts) existing.ts = log.ts;
+    }
+  }
+
+  const rpcOnly = rpcLogs.filter(l => !explorerKeys.has(`${l.txHash.toLowerCase()}-${l.logIndex}`)).length;
+  const explorerOnly = explorerLogs.filter(l => {
+    const key = `${l.txHash.toLowerCase()}-${l.logIndex}`;
+    return !rpcLogs.some(r => `${r.txHash.toLowerCase()}-${r.logIndex}` === key);
+  }).length;
+
+  const merged = Array.from(map.values());
+
+  console.log(`[Burn Feed] ✅ Merged: ${merged.length} unique events (${explorerOnly} explorer-only, ${rpcOnly} RPC-only, ${merged.length - explorerOnly - rpcOnly} in both)`);
+
+  const parts = [];
+  if (explorerLogs.length > 0) parts.push(`Explorer: ${explorerLogs.length}`);
+  if (rpcLogs.length > 0) parts.push(`RPC: ${rpcLogs.length}`);
+  const strategy = parts.length > 0 ? `Merged (${parts.join(" + ")})` : "No data";
+
+  return { logs: merged, strategy };
 }
 
 function PieChart({ data }) {
@@ -840,6 +891,26 @@ export default function CTRDashboard() {
     const interval = setInterval(fetchEvents, 120000);
     return () => clearInterval(interval);
   }, []);
+
+  // Verify that sum of burn events matches actual on-chain dead wallet balance
+  useEffect(() => {
+    if (burnEvents.length > 0 && burnedAmount > 0) {
+      const sum = burnEvents.reduce((s, e) => s + e.amount, 0);
+      const delta = Math.abs(sum - burnedAmount);
+      const pctDelta = (delta / burnedAmount) * 100;
+
+      if (pctDelta > 1) {
+        console.warn(
+          `[Burn Feed] ⚠️ MISMATCH: events sum ${sum.toFixed(2)} CTR vs dead wallet balance ${burnedAmount.toFixed(2)} CTR\n` +
+          `   → Missing ${(burnedAmount - sum).toFixed(2)} CTR (${pctDelta.toFixed(2)}% off)`
+        );
+      } else {
+        console.log(
+          `[Burn Feed] ✅ Verified: events sum ${sum.toFixed(2)} CTR matches dead wallet balance ${burnedAmount.toFixed(2)} CTR`
+        );
+      }
+    }
+  }, [burnEvents, burnedAmount]);
 
   const displayChange = priceChange24h !== null ? priceChange24h : 0;
   const changeColor = displayChange >= 0 ? "#64ffda" : "#ff6b6b";
