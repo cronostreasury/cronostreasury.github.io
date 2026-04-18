@@ -37,13 +37,15 @@ const LP_POSITION = {
   decimals: 18,
 };
 
-// Wolfie NFTs — 10 held, floor price 1200 CRO each
+// Wolfie NFTs — 10 held, floor fetched live from Ebisu's Bay
 const WOLFIE_NFTS = {
   name: "Wolfie NFTs",
   symbol: "WOLFIE",
+  contract: "0x719fdfb0ba006747a83438cc8900c8a2b35e0aff",
   count: 10,
-  floorPriceCRO: 1200,
+  fallbackFloorCRO: 1200, // used only if API is unreachable
   color: "#f59e0b",
+  marketplaceUrl: "https://app.ebisusbay.com/collection/cronos/wolfies",
 };
 
 const TOTAL_SUPPLY = 1_000_000_000;
@@ -142,6 +144,56 @@ async function fetchLPData(pairAddress, walletAddress) {
     };
   } catch (e) {
     console.log("[LP] Fetch error:", e.message);
+    return null;
+  }
+}
+
+// ==========================================
+// WOLFIE FLOOR PRICE FETCH (Ebisu's Bay API)
+// Docs: https://ebisusbay.readme.io/reference/get_collections
+// Endpoint: GET https://api.ebisusbay.com/collections?collection=<address>
+// ==========================================
+async function fetchWolfieFloor() {
+  const url = `https://api.ebisusbay.com/collections?collection=${WOLFIE_NFTS.contract}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.log(`[Wolfie Floor] HTTP ${res.status} from Ebisu's Bay API`);
+      return null;
+    }
+    const data = await res.json();
+
+    // Response shape can vary — try multiple known paths
+    const collection =
+      (Array.isArray(data?.collections) && data.collections[0]) ||
+      (Array.isArray(data?.data) && data.data[0]) ||
+      (Array.isArray(data) && data[0]) ||
+      data?.collection ||
+      null;
+
+    if (!collection) {
+      console.log("[Wolfie Floor] No collection in API response:", data);
+      return null;
+    }
+
+    // Try common floor price field names
+    const rawFloor =
+      collection.floorPrice ??
+      collection.floor_price ??
+      collection.stats?.floorPrice ??
+      collection.stats?.floor_price ??
+      null;
+
+    const floor = parseFloat(rawFloor);
+    if (isNaN(floor) || floor <= 0) {
+      console.log("[Wolfie Floor] Invalid floor value:", rawFloor);
+      return null;
+    }
+
+    console.log(`[Wolfie Floor] ✅ Live floor from Ebisu's Bay: ${floor} CRO`);
+    return floor;
+  } catch (e) {
+    console.log("[Wolfie Floor] Fetch error:", e.message);
     return null;
   }
 }
@@ -541,6 +593,11 @@ export default function CTRDashboard() {
   const [croPrice, setCroPrice] = useState(0);
   const [lpData, setLpData] = useState(null); // LP position data
 
+  // Wolfie floor price state (live from Ebisu's Bay, falls back to hardcoded)
+  const [wolfieFloorCRO, setWolfieFloorCRO] = useState(WOLFIE_NFTS.fallbackFloorCRO);
+  const [wolfieFloorLive, setWolfieFloorLive] = useState(false);
+  const [wolfieFloorUpdated, setWolfieFloorUpdated] = useState(null);
+
   const packToken = vaultTokens.find(t => t.symbol === "PACK");
   const packUsdPrice = packToken ? packToken.usdPrice : 0;
   const stakedPackUsdValue = STAKED_PACK.amount * packUsdPrice;
@@ -554,8 +611,8 @@ export default function CTRDashboard() {
     ? (lpData.treasuryCTR * ctrUsdPrice) + (lpData.treasuryPACK * packUsdPrice)
     : 0;
 
-  // Wolfie NFT USD value based on live CRO price
-  const wolfieUsdValue = WOLFIE_NFTS.count * WOLFIE_NFTS.floorPriceCRO * croPrice;
+  // Wolfie NFT USD value based on live CRO price and live floor
+  const wolfieUsdValue = WOLFIE_NFTS.count * wolfieFloorCRO * croPrice;
 
   // Calculate accrued PACK yield since staking started
   const stakingStart = new Date(STAKED_PACK.stakingStartDate + "T00:00:00Z").getTime();
@@ -592,6 +649,23 @@ export default function CTRDashboard() {
     };
     fetchPrice();
     const interval = setInterval(fetchPrice, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch Wolfie floor price from Ebisu's Bay (every 5 minutes)
+  useEffect(() => {
+    const loadFloor = async () => {
+      const floor = await fetchWolfieFloor();
+      if (floor !== null && floor > 0) {
+        setWolfieFloorCRO(floor);
+        setWolfieFloorLive(true);
+        setWolfieFloorUpdated(Date.now());
+      } else {
+        console.log(`[Wolfie Floor] Using fallback: ${WOLFIE_NFTS.fallbackFloorCRO} CRO`);
+      }
+    };
+    loadFloor();
+    const interval = setInterval(loadFloor, 5 * 60 * 1000); // every 5 min
     return () => clearInterval(interval);
   }, []);
 
@@ -1023,8 +1097,13 @@ export default function CTRDashboard() {
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <div style={{ width: 8, height: 8, borderRadius: "50%", background: WOLFIE_NFTS.color, flexShrink: 0 }} />
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, color: "#cbd5e1" }}>Wolfie NFTs <span style={{ fontSize: 10, color: "#f59e0b", background: "#f59e0b22", borderRadius: 4, padding: "1px 5px", marginLeft: 4 }}>NFT</span></div>
-                              <div style={{ fontSize: 10, color: "#b07d1a", fontFamily: "'DM Mono',monospace" }}>🐺 {WOLFIE_NFTS.count}× · Floor {fmtCompact(WOLFIE_NFTS.floorPriceCRO)} CRO each</div>
+                              <div style={{ fontSize: 13, color: "#cbd5e1" }}>
+                                Wolfie NFTs <span style={{ fontSize: 10, color: "#f59e0b", background: "#f59e0b22", borderRadius: 4, padding: "1px 5px", marginLeft: 4 }}>NFT</span>
+                                {wolfieFloorLive && (
+                                  <span style={{ fontSize: 9, color: "#64ffda", background: "#64ffda12", borderRadius: 4, padding: "1px 5px", marginLeft: 4, fontFamily: "'DM Mono',monospace" }}>LIVE</span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: 10, color: "#b07d1a", fontFamily: "'DM Mono',monospace" }}>🐺 {WOLFIE_NFTS.count}× · Floor {fmtCompact(wolfieFloorCRO)} CRO each</div>
                             </div>
                             <div style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>{WOLFIE_NFTS.count} NFTs</div>
                             <div style={{ fontSize: 12, color: "#64ffda", fontFamily: "'DM Mono',monospace", width: 70, textAlign: "right" }}>${fmtCompact(wolfieUsdValue)}</div>
@@ -1251,18 +1330,33 @@ export default function CTRDashboard() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#f59e0b22", border: "2px solid #f59e0b55", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🐺</div>
                           <div>
-                            <div style={{ fontWeight: 600, fontSize: 13 }}>Wolfie NFTs <span style={{ fontSize: 10, color: "#f59e0b", background: "#f59e0b22", borderRadius: 4, padding: "1px 5px", marginLeft: 4 }}>NFT</span></div>
-                            <div style={{ fontSize: 10, color: "#b07d1a" }}>Floor {fmtCompact(WOLFIE_NFTS.floorPriceCRO)} CRO · {WOLFIE_NFTS.count} held</div>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>
+                              Wolfie NFTs <span style={{ fontSize: 10, color: "#f59e0b", background: "#f59e0b22", borderRadius: 4, padding: "1px 5px", marginLeft: 4 }}>NFT</span>
+                              {wolfieFloorLive && (
+                                <span style={{ fontSize: 9, color: "#64ffda", background: "#64ffda12", borderRadius: 4, padding: "1px 5px", marginLeft: 4, fontFamily: "'DM Mono',monospace" }}>LIVE</span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 10, color: "#b07d1a" }}>
+                              <a
+                                href={WOLFIE_NFTS.marketplaceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: "#b07d1a", textDecoration: "none" }}
+                              >
+                                Floor {fmtCompact(wolfieFloorCRO)} CRO · {WOLFIE_NFTS.count} held
+                                {wolfieFloorLive ? " · Ebisu's Bay ↗" : " · fallback"}
+                              </a>
+                            </div>
                           </div>
                         </div>
                       </td>
                       <td style={{ fontFamily: "'DM Mono',monospace", color: "#e2e8f0" }}>{WOLFIE_NFTS.count} NFTs</td>
                       <td style={{ fontFamily: "'DM Mono',monospace", color: "#94a3b8" }}>
-                        {croPrice > 0 ? `${fmtCompact(WOLFIE_NFTS.floorPriceCRO)} CRO` : "—"}
-                        {croPrice > 0 && <div style={{ fontSize: 10, color: "#475569" }}>(≈ ${fmtPrice(WOLFIE_NFTS.floorPriceCRO * croPrice)})</div>}
+                        {croPrice > 0 ? `${fmtCompact(wolfieFloorCRO)} CRO` : "—"}
+                        {croPrice > 0 && <div style={{ fontSize: 10, color: "#475569" }}>(≈ ${fmtPrice(wolfieFloorCRO * croPrice)})</div>}
                       </td>
                       <td style={{ fontFamily: "'DM Mono',monospace", color: "#64ffda", fontWeight: 600 }}>
-                        {croPrice > 0 ? `$${fmtCompact(wolfieUsdValue)}` : `${fmtCompact(WOLFIE_NFTS.count * WOLFIE_NFTS.floorPriceCRO)} CRO`}
+                        {croPrice > 0 ? `$${fmtCompact(wolfieUsdValue)}` : `${fmtCompact(WOLFIE_NFTS.count * wolfieFloorCRO)} CRO`}
                       </td>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1272,7 +1366,9 @@ export default function CTRDashboard() {
                           <span style={{ fontSize: 11, color: "#64748b" }}>{pct}%</span>
                         </div>
                       </td>
-                      <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#f59e0b" }}>Floor price</td>
+                      <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#f59e0b" }}>
+                        {wolfieFloorLive ? "Live floor" : "Floor price"}
+                      </td>
                       <td style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#475569" }}>—</td>
                     </tr>
                   );
