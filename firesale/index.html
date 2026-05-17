@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CTR Firesale Friday 🔥 | Cronos Treasury Reserve</title>
-<meta name="description" content="Weekly CTR token sale at market price. Connect your wallet, place your bid, grab CTR before it's gone.">
+<meta name="description" content="Monthly CTR token sale at market price. Connect your wallet, place your bid, grab CTR before it's gone.">
 <link rel="icon" href="/Logo1.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
@@ -404,7 +404,7 @@
 
     <h1>Firesale<br>Friday</h1>
     <div class="sub">
-      Weekly <strong>CTR</strong> token sale — exclusively for holders.
+      Monthly <strong>CTR</strong> token sale — exclusively for holders.
       Connect your wallet, place your bid, and buy CTR at market price with <strong>zero tax</strong>.
     </div>
   </div>
@@ -412,14 +412,15 @@
   <div class="countdown-section">
     <div class="countdown-label" id="cdLabel">Next Firesale Starts In</div>
     <div class="countdown-grid" id="cdGrid">
+      <div class="countdown-box"><div class="num" id="cd-d">--</div><div class="unit">Days</div></div>
       <div class="countdown-box"><div class="num" id="cd-h">--</div><div class="unit">Hours</div></div>
-      <div class="countdown-box"><div class="num" id="cd-m">--</div><div class="unit">Minutes</div></div>
-      <div class="countdown-box"><div class="num" id="cd-s">--</div><div class="unit">Seconds</div></div>
+      <div class="countdown-box"><div class="num" id="cd-m">--</div><div class="unit">Min</div></div>
+      <div class="countdown-box"><div class="num" id="cd-s">--</div><div class="unit">Sec</div></div>
     </div>
     <div class="live-banner" id="liveBanner" style="display:none">🔥 FIRESALE IS LIVE — BID NOW! 🔥</div>
     <div class="closed-banner" id="closedBanner" style="display:none">
       <div class="closed-title">🏁 AUCTION CLOSED</div>
-      <div class="closed-sub">Winners are listed below. Next auction opens Friday 00:00 UTC.</div>
+      <div class="closed-sub">Winners are listed below. Next auction opens on the last Friday of the month at 00:00 UTC.</div>
     </div>
     <div class="winners-grid" id="winnersGrid" style="display:none"></div>
   </div>
@@ -512,7 +513,7 @@
     <div class="rules-grid">
       <div class="rule-item"><div class="num">01</div>Connect your Cronos wallet. Only CTR holders can participate (Open lots available for new holders).</div>
       <div class="rule-item"><div class="num">02</div>Each lot is a single auction. Select a lot and outbid the current highest bidder by the minimum increment for that tier.</div>
-      <div class="rule-item"><div class="num">03</div>Auction is live every Friday 00:00 UTC → Sunday 00:00 UTC (48h). Highest bidder wins.</div>
+      <div class="rule-item"><div class="num">03</div>Auction runs once a month on the last Friday 00:00 UTC through Sunday 00:00 UTC (48h). Highest bidder wins.</div>
       <div class="rule-item"><div class="num">04</div>Winners send CRO (bid amount) to the Treasury wallet. CTR is sent to your wallet after payment.</div>
     </div>
   </div>
@@ -563,7 +564,7 @@ const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>{if(n===undefined||n===null||isNaN(n))return'0';return n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});};
 const fmtC=n=>{if(n===undefined||n===null||isNaN(n))return'0';return n>=1e9?`${(n/1e9).toFixed(2)}B`:n>=1e6?`${(n/1e6).toFixed(2)}M`:n>=1e3?`${(n/1e3).toFixed(1)}K`:n.toFixed(0);};
 const fmtP=p=>{if(p===undefined||p===null||isNaN(p))return'0';return p<.0001?p.toFixed(8):p<.01?p.toFixed(6):p<1?p.toFixed(4):fmt(p);};
-const trunc=a=>a?`${a.slice(0,6)}…${a.slice(-4)}`:'';
+const trunc=a=>a?`${a.slice(0,6)}\u2026${a.slice(-4)}`:'';
 function toast(msg,type='info'){const t=$('toast');t.textContent=msg;t.className=`toast show ${type}`;clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',4000);}
 
 // ===================== PARTICLES =====================
@@ -607,35 +608,39 @@ function getBidStep(lotId) {
   return 50;                                   // Titan & Legend: 50 CRO
 }
 
-// ===================== AUCTION STATE =====================
+// ===================== AUCTION SCHEDULE (last Friday of month, 48h window) =====================
+function getLastFridayOfMonth(year, month) {
+  // month is 0-indexed
+  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+  const daysBack = (lastDay.getUTCDay() - 5 + 7) % 7;
+  return new Date(Date.UTC(year, month, lastDay.getUTCDate() - daysBack, 0, 0, 0));
+}
+
 function getAuctionState() {
   const now = new Date();
-  const day = now.getUTCDay();
-  if (day === 5 || day === 6) return 'live';
+  const lastFri = getLastFridayOfMonth(now.getUTCFullYear(), now.getUTCMonth());
+  const windowEnd = new Date(lastFri.getTime() + 48 * 3600 * 1000);
+  if (now >= lastFri && now < windowEnd) return 'live';
   return 'closed';
 }
 
-function getNextFridayStart() {
+function getNextAuctionStart() {
   const now = new Date();
-  const day = now.getUTCDay();
-  let daysUntilFri = (5 - day + 7) % 7;
-  if (daysUntilFri === 0) daysUntilFri = 7;
-  if (day === 6) daysUntilFri = 6;
-  const t = new Date(now);
-  t.setUTCDate(t.getUTCDate() + daysUntilFri);
-  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 0, 0, 0));
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const lastFri = getLastFridayOfMonth(year, month);
+  // If today is before this month's last Friday, that's the next one
+  if (now < lastFri) return lastFri;
+  // Otherwise next month
+  const nextMonth = month === 11 ? 0 : month + 1;
+  const nextYear  = month === 11 ? year + 1 : year;
+  return getLastFridayOfMonth(nextYear, nextMonth);
 }
 
 function getAuctionEndTime() {
   const now = new Date();
-  const day = now.getUTCDay();
-  let daysUntilSun;
-  if (day === 5) daysUntilSun = 2;
-  else if (day === 6) daysUntilSun = 1;
-  else return null;
-  const t = new Date(now);
-  t.setUTCDate(t.getUTCDate() + daysUntilSun);
-  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 0, 0, 0));
+  const lastFri = getLastFridayOfMonth(now.getUTCFullYear(), now.getUTCMonth());
+  return new Date(lastFri.getTime() + 48 * 3600 * 1000);
 }
 
 let _lastWinnersHash = '';
@@ -652,12 +657,11 @@ function updCD() {
     _lastWinnersHash = '';
 
     const end = getAuctionEndTime();
-    if (end) {
-      const d = Math.max(0, end - Date.now());
-      $('cd-h').textContent = String(Math.floor(d / 36e5)).padStart(2, '0');
-      $('cd-m').textContent = String(Math.floor((d % 36e5) / 6e4)).padStart(2, '0');
-      $('cd-s').textContent = String(Math.floor((d % 6e4) / 1e3)).padStart(2, '0');
-    }
+    const d = Math.max(0, end - Date.now());
+    $('cd-d').textContent = String(Math.floor(d / 864e5)).padStart(2, '0');
+    $('cd-h').textContent = String(Math.floor((d % 864e5) / 36e5)).padStart(2, '0');
+    $('cd-m').textContent = String(Math.floor((d % 36e5) / 6e4)).padStart(2, '0');
+    $('cd-s').textContent = String(Math.floor((d % 6e4) / 1e3)).padStart(2, '0');
   } else {
     $('cdLabel').textContent = 'Next Auction Opens In';
     $('cdLabel').style.display = 'block';
@@ -668,8 +672,9 @@ function updCD() {
     const hash = JSON.stringify(S.bids.map(b=>b.lotId+getBidAmount(b)));
     if (hash !== _lastWinnersHash) { renderWinners(); _lastWinnersHash = hash; }
 
-    const d = Math.max(0, getNextFridayStart() - Date.now());
-    $('cd-h').textContent = String(Math.floor(d / 36e5)).padStart(2, '0');
+    const d = Math.max(0, getNextAuctionStart() - Date.now());
+    $('cd-d').textContent = String(Math.floor(d / 864e5)).padStart(2, '0');
+    $('cd-h').textContent = String(Math.floor((d % 864e5) / 36e5)).padStart(2, '0');
     $('cd-m').textContent = String(Math.floor((d % 36e5) / 6e4)).padStart(2, '0');
     $('cd-s').textContent = String(Math.floor((d % 6e4) / 1e3)).padStart(2, '0');
   }
@@ -694,14 +699,14 @@ function renderWinners() {
     }
     return `<div class="winner-card">
       <div class="wc-lot">${l.tagLabel} — ${fmtC(l.amount)} CTR</div>
-      <div class="wc-none">No bids this week</div>
+      <div class="wc-none">No bids this month</div>
     </div>`;
   }).join('');
 }
 
 // ===================== PRICE =====================
 async function fetchPrice(){try{const r=await fetch(DEX_PAIR),d=await r.json(),p=d.pair;if(!p)return;S.ctrPrice=parseFloat(p.priceUsd)||0;S.ctrChange24h=parseFloat(p.priceChange?.h24)||0;S.ctrMcap=parseFloat(p.fdv)||0;S.ctrVolume=parseFloat(p.volume?.h24)||0;const pn=parseFloat(p.priceNative)||0;if(pn>0&&S.ctrPrice>0)S.croPrice=S.ctrPrice/pn;renderPrice();renderLots();updAuction();}catch(e){console.error(e);}}
-function renderPrice(){$('ctrPrice').textContent=S.ctrPrice>0?`$${fmtP(S.ctrPrice)}`:'...';const c=S.ctrChange24h,el=$('ctrChange');el.textContent=c!==0?`${c>0?'▲':'▼'} ${Math.abs(c).toFixed(2)}% (24h)`:'';el.className=`change ${c>=0?'up':'down'}`;$('ctrMcap').textContent=S.ctrMcap>0?`$${fmtC(S.ctrMcap)}`:'...';$('ctrVol').textContent=S.ctrVolume>0?`$${fmtC(S.ctrVolume)}`:'...';}
+function renderPrice(){$('ctrPrice').textContent=S.ctrPrice>0?`$${fmtP(S.ctrPrice)}`:'...';const c=S.ctrChange24h,el=$('ctrChange');el.textContent=c!==0?`${c>0?'\u25b2':'\u25bc'} ${Math.abs(c).toFixed(2)}% (24h)`:'';el.className=`change ${c>=0?'up':'down'}`;$('ctrMcap').textContent=S.ctrMcap>0?`$${fmtC(S.ctrMcap)}`:'...';$('ctrVol').textContent=S.ctrVolume>0?`$${fmtC(S.ctrVolume)}`:'...';}
 
 // ===================== WALLET =====================
 async function connectWallet(){if(!window.ethereum){toast('No wallet detected. Install MetaMask or Crypto.com DeFi Wallet.','error');return;}const btn=$('btnConnect');try{btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting...';const accs=await window.ethereum.request({method:'eth_requestAccounts'});if(!accs.length)throw new Error('No account');try{await window.ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:CRONOS_CHAIN_ID}]});}catch(e){if(e.code===4902)await window.ethereum.request({method:'wallet_addEthereumChain',params:[{chainId:CRONOS_CHAIN_ID,chainName:'Cronos',nativeCurrency:{name:'CRO',symbol:'CRO',decimals:18},rpcUrls:[CRONOS_RPC],blockExplorerUrls:['https://explorer.cronos.org/']}]});}S.wallet=accs[0];await fetchBal();renderWallet();updAuction();toast('Wallet connected on Cronos!','success');window.ethereum.on('accountsChanged',a=>{if(!a.length)disconnectWallet();else{S.wallet=a[0];fetchBal().then(()=>{renderWallet();updAuction();});}});window.ethereum.on('chainChanged',()=>{fetchBal().then(()=>renderWallet());});}catch(e){console.error(e);toast('Connection failed: '+(e.message||e),'error');}finally{btn.disabled=false;btn.textContent='Connect Wallet';}}
@@ -747,7 +752,7 @@ function renderLots(){
     const c=document.createElement('div');
     c.className=`lot-card${S.selectedLot===l.id?' selected':''}${!isUnlocked&&S.wallet?' locked':''}`;
     c.onclick=()=>{
-      if(!isAuctionLive()){toast('Auction is closed. Come back next Friday!','error');return;}
+      if(!isAuctionLive()){toast('Auction is closed. Come back on the last Friday of the month!','error');return;}
       if(!S.wallet){toast('Connect your wallet first.','error');return;}
       if(!isUnlocked){toast(`You need at least ${fmtC(l.minHold)} CTR to unlock this lot. You hold ${fmtC(S.ctrBalance)}.`,'error');return;}
       selLot(l.id);
@@ -797,13 +802,12 @@ function updAuction(){
   $('auctionMinBid').textContent=minBid>0?fmt(minBid,0)+' CRO':'...';
   $('auctionMinBidSub').textContent=`Starting price or +${step} CRO`;
 
-  // Update +/- button labels to show step size
-  $('btnBidDown').textContent=`−${step}`;
+  $('btnBidDown').textContent=`\u2212${step}`;
   $('btnBidUp').textContent=`+${step}`;
 
   if(!S.yourBid||S.yourBid<minBid) S.yourBid=minBid;
   $('yourBidDisplay').textContent=S.yourBid>0?fmt(S.yourBid,0)+' CRO':'...';
-  $('bidCtrAmount').textContent=S.yourBid>0?`≈ ${fmtC(l.amount)} CTR for ${fmt(S.yourBid,0)} CRO`:'';
+  $('bidCtrAmount').textContent=S.yourBid>0?`\u2248 ${fmtC(l.amount)} CTR for ${fmt(S.yourBid,0)} CRO`:'';
 
   $('sumLot').textContent=l.label+' ('+fmtC(l.amount)+' CTR)';
   $('sumCtr').textContent=fmtC(l.amount);
@@ -824,7 +828,7 @@ function adjustBid(direction){
 
 function updBtn(){
   const b=$('btnBid');
-  if(!isAuctionLive()){b.textContent='🔒 Auction Closed — Next Friday';b.disabled=true;}
+  if(!isAuctionLive()){b.textContent='🔒 Auction Closed — Last Friday of Month';b.disabled=true;}
   else if(!S.wallet){b.textContent='Connect Wallet to Bid';b.disabled=true;}
   else if(!S.selectedLot){b.textContent='Select a Lot First';b.disabled=true;}
   else{
@@ -860,7 +864,7 @@ function tAgo(ts){const d=Date.now()-new Date(ts).getTime();if(d<6e4)return'just
 
 // ===================== PLACE BID =====================
 async function placeBid(){
-  if(!isAuctionLive()){toast('Auction is closed. Come back next Friday!','error');return;}
+  if(!isAuctionLive()){toast('Auction is closed. Come back on the last Friday of the month!','error');return;}
   if(!S.wallet){toast('Connect your wallet first.','error');return;}
   if(!S.selectedLot){toast('Select a lot first.','error');return;}
 
@@ -935,5 +939,3 @@ document.addEventListener('DOMContentLoaded',init);
 </script>
 </body>
 </html>
-ENDOFFILE
-echo "File written successfully, size: $(wc -c < /mnt/user-data/outputs/index.html) bytes"
