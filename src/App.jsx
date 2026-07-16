@@ -49,13 +49,21 @@ const WOLFIE_NFTS = {
 };
 
 const TOTAL_SUPPLY = 1_000_000_000;
-const BURN_WALLET = "0x000000000000000000000000000000000000dEaD";
 const CTR_ADDRESS = "0xF3672F0cF2E45B28AC4a1D50FD8aC2eB555c21FC";
+
+// All recognized dead/burn addresses — every CTR transfer to any of these counts as a burn,
+// including burn() calls which emit a Transfer to the zero address
+const BURN_ADDRESSES = [
+  "0x000000000000000000000000000000000000dEaD",
+  "0x0000000000000000000000000000000000000000",
+  "0x0000000000000000000000000000000000000001",
+];
+const BURN_ADDRESS_SET = new Set(BURN_ADDRESSES.map(a => a.toLowerCase()));
 
 // ERC-20 Transfer event topic
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-// Dead wallet as topic (padded, lowercase — required for Cronos RPC)
-const DEAD_TOPIC = "0x000000000000000000000000000000000000000000000000000000000000dead";
+// Dead wallets as topics (padded, lowercase — required for Cronos RPC)
+const BURN_TOPICS = BURN_ADDRESSES.map(a => "0x" + a.slice(2).toLowerCase().padStart(64, "0"));
 
 const fmt = (n, dec = 2) => n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const fmtCompact = (n) => n >= 1e6 ? `${(n/1e6).toFixed(2)}M` : n >= 1e3 ? `${(n/1e3).toFixed(1)}K` : n.toFixed(0);
@@ -229,38 +237,40 @@ async function getCurrentBlockNumber() {
 // Fallback: Chunked eth_getLogs (500k blocks)
 // ==========================================
 
-async function fetchBurnTransfersExplorer() {
-  console.log("[Burn Feed] Fetching via Cronos Explorer API (paginated)...");
+async function fetchBurnTransfersExplorerForAddress(burnAddress) {
   const allLogs = [];
   const MAX_PAGES = 20;
   const OFFSET = 1000; // Blockscout uses 'offset' as page size (not 'limit')
 
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const url = `https://cronos.org/explorer/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&address=${BURN_WALLET}&sort=desc&page=${page}&offset=${OFFSET}`;
+    const url = `https://cronos.org/explorer/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&address=${burnAddress}&sort=desc&page=${page}&offset=${OFFSET}`;
 
     try {
       const res = await fetch(url);
       if (!res.ok) {
-        console.log(`[Burn Feed] Explorer page ${page} HTTP ${res.status}`);
+        console.log(`[Burn Feed] Explorer ${burnAddress.slice(0, 10)}… page ${page} HTTP ${res.status}`);
         break;
       }
       const data = await res.json();
 
       if (data.status !== "1" || !Array.isArray(data.result)) {
         if (page === 1) {
-          console.log("[Burn Feed] Explorer API: no transactions on first page (status:", data.status, ")");
+          console.log(`[Burn Feed] Explorer API: no transactions for ${burnAddress.slice(0, 10)}… (status:`, data.status, ")");
           return [];
         }
         break;
       }
 
       const rawCount = data.result.length;
+      // The explorer returns txs where the address is sender OR receiver —
+      // keep only actual burns (transfers INTO a dead wallet)
       const pageLogs = data.result
-        .filter(tx => tx.to?.toLowerCase() === BURN_WALLET.toLowerCase())
+        .filter(tx => BURN_ADDRESS_SET.has(tx.to?.toLowerCase()))
         .map(tx => ({
           txHash: tx.hash,
           blockNumber: parseInt(tx.blockNumber) || 0,
           from: (tx.from || "").toLowerCase(),
+          to: (tx.to || "").toLowerCase(),
           amount: Number(BigInt(tx.value || "0")) / 1e18,
           ts: tx.timeStamp ? parseInt(tx.timeStamp) * 1000 : Date.now(),
           logIndex: parseInt(tx.logIndex) || 0,
@@ -268,15 +278,29 @@ async function fetchBurnTransfersExplorer() {
         .filter(l => l.amount > 0);
 
       allLogs.push(...pageLogs);
-      console.log(`[Burn Feed] Explorer page ${page}: ${pageLogs.length} burns (${rawCount} raw tx)`);
+      console.log(`[Burn Feed] Explorer ${burnAddress.slice(0, 10)}… page ${page}: ${pageLogs.length} burns (${rawCount} raw tx)`);
 
       // Stop if this page was not full (no more pages)
       if (rawCount < OFFSET) break;
     } catch (e) {
-      console.log(`[Burn Feed] Explorer page ${page} exception:`, e.message);
+      console.log(`[Burn Feed] Explorer ${burnAddress.slice(0, 10)}… page ${page} exception:`, e.message);
       break;
     }
   }
+
+  return allLogs;
+}
+
+async function fetchBurnTransfersExplorer() {
+  console.log("[Burn Feed] Fetching via Cronos Explorer API (all dead wallets, paginated)...");
+
+  const perAddress = await Promise.all(
+    BURN_ADDRESSES.map(a => fetchBurnTransfersExplorerForAddress(a).catch(e => {
+      console.log(`[Burn Feed] Explorer ${a.slice(0, 10)}… failed:`, e.message);
+      return [];
+    }))
+  );
+  const allLogs = perAddress.flat();
 
   console.log(`[Burn Feed] Explorer total: ${allLogs.length} burn events`);
   return allLogs;
@@ -307,7 +331,7 @@ async function fetchBurnTransfersChunked() {
             topics: [
               TRANSFER_TOPIC,
               null,
-              DEAD_TOPIC,
+              BURN_TOPICS, // array = OR match across all dead wallets
             ],
           }],
           id: 1,
@@ -329,6 +353,7 @@ async function fetchBurnTransfersChunked() {
 
   const logs = allLogs.map(log => {
     const from = "0x" + log.topics[1].slice(26);
+    const to = "0x" + log.topics[2].slice(26);
     const rawAmount = BigInt(log.data);
     const amount = Number(rawAmount) / 1e18;
     return {
@@ -336,6 +361,7 @@ async function fetchBurnTransfersChunked() {
       blockNumber: parseInt(log.blockNumber, 16),
       blockHex: log.blockNumber,
       from: from.toLowerCase(),
+      to: to.toLowerCase(),
       amount,
       logIndex: parseInt(log.logIndex, 16),
     };
@@ -813,11 +839,18 @@ export default function CTRDashboard() {
       .catch(() => setTreasuryHistory([]));
   }, []);
 
-  // Fetch burned CTR from dead wallet
+  // Fetch total burned CTR: on-chain supply reduction (burn() → 0x0) + balances held by dead wallets
   useEffect(() => {
     const fetchBurned = async () => {
       try {
-        const burned = await getTokenBalance(CTR_ADDRESS, BURN_WALLET, 18);
+        const [supplyHex, ...deadBalances] = await Promise.all([
+          ethCall(CTR_ADDRESS, "0x18160ddd"), // totalSupply()
+          ...BURN_ADDRESSES.map(a => getTokenBalance(CTR_ADDRESS, a, 18)),
+        ]);
+        const chainSupply = Number(BigInt(supplyHex)) / 1e18;
+        // burn() reduces totalSupply without crediting any wallet — capture that as supply delta
+        const supplyBurned = chainSupply > 0 ? Math.max(0, TOTAL_SUPPLY - chainSupply) : 0;
+        const burned = supplyBurned + deadBalances.reduce((s, b) => s + b, 0);
         setBurnedAmount(burned);
         setBurnLoading(false);
       } catch (e) {
@@ -851,6 +884,7 @@ export default function CTRDashboard() {
             id: `${l.txHash}-${l.logIndex || i}`,
             txHash: l.txHash,
             from: l.from,
+            to: l.to,
             amount: l.amount,
             blockNumber: l.blockNumber,
             ts: l.ts,
@@ -872,6 +906,7 @@ export default function CTRDashboard() {
             id: `${l.txHash}-${l.logIndex}`,
             txHash: l.txHash,
             from: l.from,
+            to: l.to,
             amount: l.amount,
             blockNumber: l.blockNumber,
             ts: blockTimestamps[l.blockHex] || Date.now(),
@@ -892,7 +927,7 @@ export default function CTRDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Verify that sum of burn events matches actual on-chain dead wallet balance
+  // Verify that sum of burn events matches actual on-chain total burned
   useEffect(() => {
     if (burnEvents.length > 0 && burnedAmount > 0) {
       const sum = burnEvents.reduce((s, e) => s + e.amount, 0);
@@ -901,12 +936,12 @@ export default function CTRDashboard() {
 
       if (pctDelta > 1) {
         console.warn(
-          `[Burn Feed] ⚠️ MISMATCH: events sum ${sum.toFixed(2)} CTR vs dead wallet balance ${burnedAmount.toFixed(2)} CTR\n` +
+          `[Burn Feed] ⚠️ MISMATCH: events sum ${sum.toFixed(2)} CTR vs on-chain total burned ${burnedAmount.toFixed(2)} CTR\n` +
           `   → Missing ${(burnedAmount - sum).toFixed(2)} CTR (${pctDelta.toFixed(2)}% off)`
         );
       } else {
         console.log(
-          `[Burn Feed] ✅ Verified: events sum ${sum.toFixed(2)} CTR matches dead wallet balance ${burnedAmount.toFixed(2)} CTR`
+          `[Burn Feed] ✅ Verified: events sum ${sum.toFixed(2)} CTR matches on-chain total burned ${burnedAmount.toFixed(2)} CTR`
         );
       }
     }
@@ -1041,7 +1076,7 @@ export default function CTRDashboard() {
             { label: "Market Cap", value: liveMarketCap !== null ? `$${fmtCompact(liveMarketCap)}` : "...", sub: "Live · DexScreener", c: "#7c3aed" },
             { label: "Total Value", value: (liveMarketCap !== null && !vaultLoading) ? `$${fmtCompact(liveMarketCap + vaultTotal)}` : "...", sub: "Market Cap + Treasury", c: "#a78bfa" },
             { label: "Total Supply", value: "1,000.00M", sub: "Fixed supply", c: "#f59e0b" },
-            { label: "Total Burned", value: burnLoading ? "..." : `${fmtCompact(burnedAmount)} CTR`, sub: burnedAmount > 0 ? `${(burnedAmount / TOTAL_SUPPLY * 100).toFixed(4)}% of supply` : "Live · Dead Wallet", c: "#ff6b6b" },
+            { label: "Total Burned", value: burnLoading ? "..." : `${fmtCompact(burnedAmount)} CTR`, sub: burnedAmount > 0 ? `${(burnedAmount / TOTAL_SUPPLY * 100).toFixed(4)}% of supply` : "Live · On-chain", c: "#ff6b6b" },
             { label: "Vault TVL", value: vaultLoading ? "Loading..." : `$${fmtCompact(animVault)}`, sub: "Live · Cronos RPC", c: "#64ffda" },
           ].map(s => (
             <div key={s.label} className="stat-card">
@@ -1215,7 +1250,7 @@ export default function CTRDashboard() {
                         { label: "Total Burned", val: burnLoading ? "..." : `${fmtCompact(burnedAmount)} CTR`, c: "#ff6b6b" },
                         { label: "Total Supply", val: "1,000.00M CTR", c: "#64ffda" },
                         { label: "Circulating Supply", val: burnLoading ? "..." : `${fmtCompact(TOTAL_SUPPLY - burnedAmount)} CTR`, c: "#94a3b8" },
-                        { label: "Burn Wallet", val: `${BURN_WALLET.slice(0,6)}…${BURN_WALLET.slice(-4)}`, c: "#7c3aed" },
+                        { label: "Burn Wallets", val: `${BURN_ADDRESSES.length} dead addresses`, c: "#7c3aed" },
                       ].map(s => (
                         <div key={s.label} style={{ background: "#1a2440", borderRadius: 10, padding: "10px 14px" }}>
                           <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{s.label}</div>
@@ -1225,11 +1260,13 @@ export default function CTRDashboard() {
                     </div>
                     <div style={{ marginTop: 10, background: "#1a2440", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
-                        <div style={{ fontSize: 10, color: "#475569", marginBottom: 2 }}>Dead Wallet</div>
-                        <a href={`https://explorer.cronos.org/address/${BURN_WALLET}`} target="_blank" rel="noopener noreferrer"
-                          style={{ fontSize: 11, color: "#ff6b6b", fontFamily: "'DM Mono',monospace", textDecoration: "none" }}>
-                          {BURN_WALLET.slice(0,10)}…{BURN_WALLET.slice(-4)} ↗
-                        </a>
+                        <div style={{ fontSize: 10, color: "#475569", marginBottom: 2 }}>Dead Wallets</div>
+                        {BURN_ADDRESSES.map(addr => (
+                          <a key={addr} href={`https://explorer.cronos.org/address/${addr}`} target="_blank" rel="noopener noreferrer"
+                            style={{ display: "block", fontSize: 11, color: "#ff6b6b", fontFamily: "'DM Mono',monospace", textDecoration: "none" }}>
+                            {addr.slice(0,10)}…{addr.slice(-4)} ↗
+                          </a>
+                        ))}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#ff6b6b12", border: "1px solid #ff6b6b33", borderRadius: 99, padding: "4px 10px" }}>
                         <span style={{ fontSize: 11 }}>🔥</span>
@@ -1547,7 +1584,7 @@ export default function CTRDashboard() {
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #243152", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 16 }}>Burn Transactions</div>
-              <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>All CTR transfers to dead wallet · on-chain verified</div>
+              <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>All CTR transfers to dead wallets — from any sender · on-chain verified</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {burnEvents.length > 0 && (
@@ -1583,7 +1620,7 @@ export default function CTRDashboard() {
               <div style={{ textAlign: "center", padding: "40px 20px", color: "#475569", fontSize: 13 }}>
                 <div style={{ fontSize: 28, marginBottom: 12 }}>🔥</div>
                 <div style={{ color: "#64748b", fontFamily: "'DM Mono',monospace" }}>No burn transactions found yet</div>
-                <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>CTR transfers to the dead wallet will appear here automatically</div>
+                <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>CTR transfers to a dead wallet will appear here automatically</div>
               </div>
             ) : (
               <>
@@ -1613,6 +1650,11 @@ export default function CTRDashboard() {
                           style={{ color: "#7c3aed", fontFamily: "'DM Mono',monospace", textDecoration: "none", fontSize: 12 }}>
                           {truncAddr(e.from)} ↗
                         </a>
+                        {e.to && (
+                          <div style={{ fontSize: 9, color: "#334155", fontFamily: "'DM Mono',monospace", marginTop: 2 }}>
+                            → {truncAddr(e.to)}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <span style={{ color: "#ff6b6b", fontFamily: "'DM Mono',monospace", fontWeight: 600, fontSize: 13 }}>
