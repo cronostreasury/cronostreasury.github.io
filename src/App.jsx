@@ -206,20 +206,6 @@ async function fetchWolfieFloor() {
   }
 }
 
-// Fetch block timestamp
-async function getBlockTimestamp(blockHex) {
-  const res = await fetch(CRONOS_RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", method: "eth_getBlockByNumber", params: [blockHex, false], id: 1 }),
-  });
-  const json = await res.json();
-  if (json.result && json.result.timestamp) {
-    return Number(BigInt(json.result.timestamp)) * 1000;
-  }
-  return Date.now();
-}
-
 // Get current block number
 async function getCurrentBlockNumber() {
   const res = await fetch(CRONOS_RPC, {
@@ -232,10 +218,39 @@ async function getCurrentBlockNumber() {
 }
 
 // ==========================================
-// DUAL-STRATEGY BURN TRANSFER FETCHING
-// Primary:  cronos.org/explorer/api (Blockscout v1 / Etherscan-compatible)
-// Fallback: Chunked eth_getLogs (500k blocks)
+// BURN TRANSFER FETCHING
+// Lists EVERY CTR Transfer whose destination is a dead wallet,
+// from ANY sender.
+//
+// Primary:  Chunked eth_getLogs over the token's full history.
+//           The public Cronos RPC caps the block range per call
+//           (Ethermint default: 10,000 blocks), so the chunk size
+//           adapts until the node accepts it. Results are cached
+//           in localStorage so later visits only scan new blocks.
+// Extra:    cronos.org/explorer/api (Etherscan-compatible), merged
+//           in for anything the RPC scan missed, and shown early
+//           while the first full chain scan is still running.
 // ==========================================
+
+const BURN_CACHE_KEY = "ctr_burn_events_v3";
+const DEPLOY_BLOCK_KEY = "ctr_deploy_block_v1";
+const CHUNK_SIZE_KEY = "ctr_getlogs_chunk_v1";
+// Rescan this many blocks behind the cached tip to survive reorgs
+const REORG_SAFETY_BLOCKS = 128;
+
+const storage = {
+  get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+  set(key, val) { try { localStorage.setItem(key, val); } catch { /* unavailable or full */ } },
+};
+
+async function rpcCall(method, params) {
+  const res = await fetch(CRONOS_RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 }),
+  });
+  return res.json();
+}
 
 async function fetchBurnTransfersExplorerForAddress(burnAddress) {
   const allLogs = [];
@@ -306,122 +321,251 @@ async function fetchBurnTransfersExplorer() {
   return allLogs;
 }
 
-async function fetchBurnTransfersChunked() {
-  console.log("[Burn Feed] Using chunked eth_getLogs (fallback)...");
-  const currentBlock = await getCurrentBlockNumber();
-  const CHUNK_SIZE = 500_000;
-  const allLogs = [];
+// Binary-search the block where the CTR contract was deployed so the log
+// scan doesn't start at genesis. Falls back to the earliest CTR transfer
+// known to the explorer, then to block 1.
+async function findScanStartBlock(currentBlock) {
+  const cached = parseInt(storage.get(DEPLOY_BLOCK_KEY) || "", 10);
+  if (Number.isFinite(cached) && cached > 0) return cached;
 
-  for (let from = 1; from <= currentBlock; from += CHUNK_SIZE) {
-    const to = Math.min(from + CHUNK_SIZE - 1, currentBlock);
-    const fromHex = "0x" + from.toString(16);
-    const toHex = "0x" + to.toString(16);
-
-    try {
-      const res = await fetch(CRONOS_RPC, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "eth_getLogs",
-          params: [{
-            fromBlock: fromHex,
-            toBlock: toHex,
-            address: CTR_ADDRESS,
-            topics: [
-              TRANSFER_TOPIC,
-              null,
-              BURN_TOPICS, // array = OR match across all dead wallets
-            ],
-          }],
-          id: 1,
-        }),
-      });
-      const json = await res.json();
-      if (json.result && Array.isArray(json.result)) {
-        allLogs.push(...json.result);
-        if (json.result.length > 0) {
-          console.log(`[Burn Feed] Chunk ${fromHex}-${toHex}: found ${json.result.length} burns`);
-        }
-      }
-    } catch (e) {
-      console.log(`[Burn Feed] Chunk ${fromHex}-${toHex} failed:`, e.message);
+  try {
+    let lo = 1, hi = currentBlock;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      const json = await rpcCall("eth_getCode", [CTR_ADDRESS, "0x" + mid.toString(16)]);
+      if (json.error) throw new Error(json.error.message || "eth_getCode failed");
+      if (json.result && json.result !== "0x") hi = mid; else lo = mid + 1;
     }
+    console.log(`[Burn Feed] CTR deploy block found via eth_getCode: ${lo}`);
+    storage.set(DEPLOY_BLOCK_KEY, String(lo));
+    return lo;
+  } catch (e) {
+    console.log("[Burn Feed] Deploy block binary search failed:", e.message);
   }
 
-  console.log(`[Burn Feed] eth_getLogs total: ${allLogs.length} burn events`);
+  try {
+    const url = `https://cronos.org/explorer/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&sort=asc&page=1&offset=1`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const block = parseInt(data?.result?.[0]?.blockNumber);
+    if (data.status === "1" && Number.isFinite(block) && block > 0) {
+      console.log(`[Burn Feed] First CTR transfer per explorer: block ${block}`);
+      storage.set(DEPLOY_BLOCK_KEY, String(block));
+      return block;
+    }
+  } catch (e) {
+    console.log("[Burn Feed] Explorer deploy block lookup failed:", e.message);
+  }
 
-  const logs = allLogs.map(log => {
-    const from = "0x" + log.topics[1].slice(26);
-    const to = "0x" + log.topics[2].slice(26);
-    const rawAmount = BigInt(log.data);
-    const amount = Number(rawAmount) / 1e18;
-    return {
-      txHash: log.transactionHash,
-      blockNumber: parseInt(log.blockNumber, 16),
-      blockHex: log.blockNumber,
-      from: from.toLowerCase(),
-      to: to.toLowerCase(),
-      amount,
-      logIndex: parseInt(log.logIndex, 16),
-    };
-  });
-
-  return logs;
+  console.log("[Burn Feed] No deploy block hint — scanning from genesis");
+  return 1;
 }
 
-async function fetchBurnTransfers() {
-  console.log("[Burn Feed] Fetching from Explorer API and Cronos RPC in parallel...");
+async function getBurnLogsRange(fromBlock, toBlock) {
+  const json = await rpcCall("eth_getLogs", [{
+    fromBlock: "0x" + fromBlock.toString(16),
+    toBlock: "0x" + toBlock.toString(16),
+    address: CTR_ADDRESS,
+    // Transfer(from, to, value) where `to` is any dead wallet — an array
+    // in a topic position is OR-matched by the node
+    topics: [TRANSFER_TOPIC, null, BURN_TOPICS],
+  }]);
+  if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+  if (!Array.isArray(json.result)) throw new Error("eth_getLogs returned no result");
+  return json.result;
+}
 
-  const [explorerLogs, rpcLogs] = await Promise.all([
-    fetchBurnTransfersExplorer().catch(e => {
-      console.log("[Burn Feed] Explorer failed:", e.message);
-      return [];
-    }),
-    fetchBurnTransfersChunked().catch(e => {
-      console.log("[Burn Feed] RPC failed:", e.message);
-      return [];
-    }),
-  ]);
+// Extract a block-range cap from a node error like
+// "maximum [from, to] blocks distance: 10000"
+function parseRangeCapHint(message) {
+  const matches = (message || "").match(/\d{3,}/g) || [];
+  for (const s of matches) {
+    const n = parseInt(s, 10);
+    if (n >= 1000 && n <= 1_000_000) return n;
+  }
+  return null;
+}
 
-  console.log(`[Burn Feed] Explorer: ${explorerLogs.length} | RPC: ${rpcLogs.length}`);
+async function scanBurnLogs(startBlock, endBlock) {
+  const allLogs = [];
+  let chunkSize = parseInt(storage.get(CHUNK_SIZE_KEY) || "", 10);
+  if (!Number.isFinite(chunkSize) || chunkSize < 1000) chunkSize = 500_000;
+  let from = startBlock;
 
-  // Merge and deduplicate by txHash + logIndex
-  const map = new Map();
+  // Phase 1: learn a chunk size the node accepts (public Cronos RPC caps
+  // the range; the old fixed 500k chunks made every request fail silently)
+  for (let attempts = 0; from <= endBlock; attempts++) {
+    const to = Math.min(from + chunkSize - 1, endBlock);
+    try {
+      allLogs.push(...await getBurnLogsRange(from, to));
+      from = to + 1;
+      break;
+    } catch (e) {
+      const hint = parseRangeCapHint(e.message);
+      const next = hint && hint < chunkSize ? hint : Math.floor(chunkSize / 2);
+      console.log(`[Burn Feed] getLogs range ${chunkSize} rejected (${e.message}) — trying ${next}`);
+      if (next < 500 || attempts > 25) throw new Error("eth_getLogs rejected even small ranges: " + e.message);
+      chunkSize = next;
+    }
+  }
+  storage.set(CHUNK_SIZE_KEY, String(chunkSize));
 
-  // Add RPC logs first (they have reliable logIndex and are closer to blockchain truth)
-  for (const log of rpcLogs) {
-    const key = `${log.txHash.toLowerCase()}-${log.logIndex}`;
-    map.set(key, log);
+  // Phase 2: scan the rest in parallel batches
+  const PARALLEL = 5;
+  while (from <= endBlock) {
+    const ranges = [];
+    while (ranges.length < PARALLEL && from <= endBlock) {
+      const to = Math.min(from + chunkSize - 1, endBlock);
+      ranges.push([from, to]);
+      from = to + 1;
+    }
+    const results = await Promise.all(ranges.map(async ([f, t]) => {
+      try {
+        return await getBurnLogsRange(f, t);
+      } catch {
+        // retry once with the range split in half (covers transient
+        // failures and per-call result caps)
+        const mid = Math.floor((f + t) / 2);
+        const [a, b] = await Promise.all([getBurnLogsRange(f, mid), getBurnLogsRange(mid + 1, t)]);
+        return [...a, ...b];
+      }
+    }));
+    for (const logs of results) allLogs.push(...logs);
   }
 
-  // Overlay Explorer logs — add new ones, enrich existing RPC logs with timestamps
-  const explorerKeys = new Set();
-  for (const log of explorerLogs) {
-    const key = `${log.txHash.toLowerCase()}-${log.logIndex}`;
-    explorerKeys.add(key);
-    if (!map.has(key)) {
-      map.set(key, log);
-    } else {
-      const existing = map.get(key);
-      if (!existing.ts && log.ts) existing.ts = log.ts;
+  console.log(`[Burn Feed] eth_getLogs scan ${startBlock}-${endBlock}: ${allLogs.length} burn events (chunk size ${chunkSize})`);
+  return allLogs;
+}
+
+function normalizeRpcLog(log) {
+  return {
+    txHash: log.transactionHash,
+    blockNumber: parseInt(log.blockNumber, 16),
+    blockHex: log.blockNumber,
+    from: ("0x" + log.topics[1].slice(26)).toLowerCase(),
+    to: ("0x" + log.topics[2].slice(26)).toLowerCase(),
+    amount: Number(BigInt(log.data)) / 1e18,
+    logIndex: parseInt(log.logIndex, 16),
+    ts: 0,
+  };
+}
+
+function loadBurnCache() {
+  try {
+    const c = JSON.parse(storage.get(BURN_CACHE_KEY) || "null");
+    if (c && c.token === CTR_ADDRESS.toLowerCase() && Array.isArray(c.events) && Number.isFinite(c.scannedTo)) return c;
+  } catch { /* corrupt cache */ }
+  return null;
+}
+
+async function resolveTimestamps(events) {
+  const pending = events.filter(e => !e.ts);
+  const uniqueBlocks = [...new Set(pending.map(e => e.blockHex || "0x" + e.blockNumber.toString(16)))];
+  const blockTs = {};
+  const BATCH = 10;
+  for (let i = 0; i < uniqueBlocks.length; i += BATCH) {
+    const batch = uniqueBlocks.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map(async bh => {
+      try {
+        const json = await rpcCall("eth_getBlockByNumber", [bh, false]);
+        return json.result?.timestamp ? Number(BigInt(json.result.timestamp)) * 1000 : 0;
+      } catch { return 0; }
+    }));
+    batch.forEach((bh, idx) => { blockTs[bh] = results[idx]; });
+  }
+  for (const e of pending) {
+    e.ts = blockTs[e.blockHex || "0x" + e.blockNumber.toString(16)] || 0;
+  }
+}
+
+async function fetchBurnTransfersChunked() {
+  const currentBlock = await getCurrentBlockNumber();
+  const cache = loadBurnCache();
+  const events = cache ? cache.events : [];
+  let scanFrom;
+  if (cache) {
+    scanFrom = Math.max(Math.min(cache.scannedTo + 1, currentBlock) - REORG_SAFETY_BLOCKS, 1);
+    console.log(`[Burn Feed] Cache: ${events.length} events up to block ${cache.scannedTo} — rescanning from ${scanFrom}`);
+  } else {
+    scanFrom = await findScanStartBlock(currentBlock);
+    console.log(`[Burn Feed] No cache — full scan from block ${scanFrom} to ${currentBlock}`);
+  }
+
+  let scanComplete = true;
+  if (scanFrom <= currentBlock) {
+    try {
+      const fresh = (await scanBurnLogs(scanFrom, currentBlock))
+        .map(normalizeRpcLog)
+        .filter(l => l.amount > 0);
+      const seen = new Set(events.map(e => `${e.txHash.toLowerCase()}-${e.logIndex}`));
+      for (const l of fresh) {
+        const key = `${l.txHash.toLowerCase()}-${l.logIndex}`;
+        if (!seen.has(key)) { events.push(l); seen.add(key); }
+      }
+    } catch (e) {
+      // Without a cache a partial scan is useless (it would hide older
+      // burns) — but cached events are complete up to cache.scannedTo,
+      // so keep serving them and retry the incremental scan next cycle.
+      if (!cache) throw e;
+      console.log("[Burn Feed] Incremental scan failed, serving cached events:", e.message);
+      scanComplete = false;
     }
   }
 
-  const rpcOnly = rpcLogs.filter(l => !explorerKeys.has(`${l.txHash.toLowerCase()}-${l.logIndex}`)).length;
-  const explorerOnly = explorerLogs.filter(l => {
-    const key = `${l.txHash.toLowerCase()}-${l.logIndex}`;
-    return !rpcLogs.some(r => `${r.txHash.toLowerCase()}-${r.logIndex}` === key);
-  }).length;
+  await resolveTimestamps(events);
+  if (scanComplete) {
+    storage.set(BURN_CACHE_KEY, JSON.stringify({ token: CTR_ADDRESS.toLowerCase(), scannedTo: currentBlock, events }));
+  }
+  return events;
+}
 
-  const merged = Array.from(map.values());
+// onPartial (optional) is called with explorer results if they arrive
+// while the full RPC chain scan is still running, so the feed can render
+// early instead of waiting for the first complete scan.
+async function fetchBurnTransfers(onPartial) {
+  console.log("[Burn Feed] Fetching from Cronos RPC (full scan) and Explorer API in parallel...");
 
-  console.log(`[Burn Feed] ✅ Merged: ${merged.length} unique events (${explorerOnly} explorer-only, ${rpcOnly} RPC-only, ${merged.length - explorerOnly - rpcOnly} in both)`);
+  let rpcDone = false;
+  const explorerPromise = fetchBurnTransfersExplorer().catch(e => {
+    console.log("[Burn Feed] Explorer failed:", e.message);
+    return [];
+  });
+  explorerPromise.then(logs => {
+    if (!rpcDone && logs.length > 0 && onPartial) onPartial(logs);
+  });
+
+  const rpcEvents = await fetchBurnTransfersChunked().catch(e => {
+    console.log("[Burn Feed] RPC scan failed:", e.message);
+    return null;
+  });
+  rpcDone = true;
+  const explorerLogs = await explorerPromise;
+
+  console.log(`[Burn Feed] RPC: ${rpcEvents ? rpcEvents.length : "failed"} | Explorer: ${explorerLogs.length}`);
+
+  // The RPC scan is authoritative: it contains every log of every tx it
+  // covers. Explorer entries only fill in txs the scan doesn't know at all
+  // (their logIndex is unreliable, so txHash is the merge key).
+  const merged = rpcEvents ? [...rpcEvents] : [];
+  const rpcTxs = new Set(merged.map(e => e.txHash.toLowerCase()));
+  const seenExplorer = new Set();
+  let explorerAdded = 0;
+  for (const l of explorerLogs) {
+    const tx = l.txHash.toLowerCase();
+    if (rpcTxs.has(tx)) continue;
+    const key = `${tx}-${l.to}-${l.logIndex}-${l.amount}`;
+    if (seenExplorer.has(key)) continue;
+    seenExplorer.add(key);
+    merged.push(l);
+    explorerAdded++;
+  }
+
+  console.log(`[Burn Feed] ✅ Merged: ${merged.length} unique events (${explorerAdded} explorer-only)`);
 
   const parts = [];
-  if (explorerLogs.length > 0) parts.push(`Explorer: ${explorerLogs.length}`);
-  if (rpcLogs.length > 0) parts.push(`RPC: ${rpcLogs.length}`);
-  const strategy = parts.length > 0 ? `Merged (${parts.join(" + ")})` : "No data";
+  if (rpcEvents) parts.push(`RPC scan: ${rpcEvents.length}`);
+  if (explorerAdded > 0 || !rpcEvents) parts.push(`Explorer: ${rpcEvents ? `+${explorerAdded}` : explorerLogs.length}`);
+  const strategy = parts.length > 0 ? parts.join(" + ") : "No data";
 
   return { logs: merged, strategy };
 }
@@ -862,60 +1006,42 @@ export default function CTRDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch ALL burn transfer events via dual strategy
+  // Fetch ALL burn transfer events (any sender → any dead wallet)
   useEffect(() => {
+    let cancelled = false;
+
+    const toDisplayEvents = (logs) => logs
+      .map((l, i) => ({
+        id: `${l.txHash}-${l.logIndex ?? i}`,
+        txHash: l.txHash,
+        from: l.from,
+        to: l.to,
+        amount: l.amount,
+        blockNumber: l.blockNumber,
+        ts: l.ts || Date.now(),
+      }))
+      .sort((a, b) => (b.ts - a.ts) || (b.blockNumber - a.blockNumber));
+
     const fetchEvents = async () => {
       try {
-        setBurnEventsLoading(true);
-        const { logs, strategy } = await fetchBurnTransfers();
-        setBurnFetchStrategy(strategy);
+        const { logs, strategy } = await fetchBurnTransfers((partialLogs) => {
+          // Explorer results landed while the full RPC chain scan is
+          // still running — show them right away
+          if (cancelled) return;
+          setBurnEvents(toDisplayEvents(partialLogs));
+          setBurnFetchStrategy("Explorer · full chain scan running…");
+          setBurnEventsLoading(false);
+        });
+        if (cancelled) return;
 
         if (!logs || logs.length === 0) {
           console.log("[Burn Feed] No burn events found from any source");
-          setBurnEvents([]);
-          setBurnEventsLoading(false);
-          return;
         }
-
-        const hasTimestamps = logs.every(l => l.ts && l.ts > 0);
-
-        if (hasTimestamps) {
-          const events = logs.map((l, i) => ({
-            id: `${l.txHash}-${l.logIndex || i}`,
-            txHash: l.txHash,
-            from: l.from,
-            to: l.to,
-            amount: l.amount,
-            blockNumber: l.blockNumber,
-            ts: l.ts,
-          })).sort((a, b) => b.ts - a.ts);
-
-          setBurnEvents(events);
-          setBurnEventsLoading(false);
-        } else {
-          const uniqueBlocks = [...new Set(logs.map(l => l.blockHex))];
-          const blockTimestamps = {};
-          const BATCH = 10;
-          for (let i = 0; i < uniqueBlocks.length; i += BATCH) {
-            const batch = uniqueBlocks.slice(i, i + BATCH);
-            const results = await Promise.all(batch.map(bh => getBlockTimestamp(bh)));
-            batch.forEach((bh, idx) => { blockTimestamps[bh] = results[idx]; });
-          }
-
-          const events = logs.map(l => ({
-            id: `${l.txHash}-${l.logIndex}`,
-            txHash: l.txHash,
-            from: l.from,
-            to: l.to,
-            amount: l.amount,
-            blockNumber: l.blockNumber,
-            ts: blockTimestamps[l.blockHex] || Date.now(),
-          })).sort((a, b) => b.ts - a.ts);
-
-          setBurnEvents(events);
-          setBurnEventsLoading(false);
-        }
+        setBurnEvents(toDisplayEvents(logs || []));
+        setBurnFetchStrategy(strategy);
+        setBurnEventsLoading(false);
       } catch (e) {
+        if (cancelled) return;
         console.log("Burn events fetch error:", e);
         setBurnEventsLoading(false);
         setBurnFetchStrategy("Error");
@@ -924,7 +1050,7 @@ export default function CTRDashboard() {
 
     fetchEvents();
     const interval = setInterval(fetchEvents, 120000);
-    return () => clearInterval(interval);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   // Verify that sum of burn events matches actual on-chain total burned
