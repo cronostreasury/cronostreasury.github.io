@@ -243,12 +243,15 @@ const storage = {
   set(key, val) { try { localStorage.setItem(key, val); } catch { /* unavailable or full */ } },
 };
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 async function rpcCall(method, params) {
   const res = await fetch(CRONOS_RPC, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 }),
   });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
@@ -386,6 +389,20 @@ function parseRangeCapHint(message) {
   return null;
 }
 
+// getBurnLogsRange with backoff retries for transient failures and
+// rate limiting (HTTP 429/5xx, network blips). Range-cap errors are
+// re-thrown immediately — the caller adjusts the chunk size for those.
+async function getBurnLogsRangeRetry(fromBlock, toBlock) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await getBurnLogsRange(fromBlock, toBlock);
+    } catch (e) {
+      if (parseRangeCapHint(e.message) || attempt >= 3) throw e;
+      await sleep(500 * 2 ** attempt + Math.random() * 300);
+    }
+  }
+}
+
 async function scanBurnLogs(startBlock, endBlock) {
   const allLogs = [];
   let chunkSize = parseInt(storage.get(CHUNK_SIZE_KEY) || "", 10);
@@ -397,21 +414,23 @@ async function scanBurnLogs(startBlock, endBlock) {
   for (let attempts = 0; from <= endBlock; attempts++) {
     const to = Math.min(from + chunkSize - 1, endBlock);
     try {
-      allLogs.push(...await getBurnLogsRange(from, to));
+      allLogs.push(...await getBurnLogsRangeRetry(from, to));
       from = to + 1;
       break;
     } catch (e) {
+      if (attempts > 25) throw new Error("eth_getLogs keeps failing: " + e.message);
       const hint = parseRangeCapHint(e.message);
       const next = hint && hint < chunkSize ? hint : Math.floor(chunkSize / 2);
       console.log(`[Burn Feed] getLogs range ${chunkSize} rejected (${e.message}) — trying ${next}`);
-      if (next < 500 || attempts > 25) throw new Error("eth_getLogs rejected even small ranges: " + e.message);
+      if (next < 500) throw new Error("eth_getLogs rejected even small ranges: " + e.message);
       chunkSize = next;
     }
   }
   storage.set(CHUNK_SIZE_KEY, String(chunkSize));
 
-  // Phase 2: scan the rest in parallel batches
-  const PARALLEL = 5;
+  // Phase 2: scan the rest in small parallel batches (kept low to stay
+  // under the public RPC's rate limits during the one-time full scan)
+  const PARALLEL = 3;
   while (from <= endBlock) {
     const ranges = [];
     while (ranges.length < PARALLEL && from <= endBlock) {
@@ -421,16 +440,16 @@ async function scanBurnLogs(startBlock, endBlock) {
     }
     const results = await Promise.all(ranges.map(async ([f, t]) => {
       try {
-        return await getBurnLogsRange(f, t);
+        return await getBurnLogsRangeRetry(f, t);
       } catch {
-        // retry once with the range split in half (covers transient
-        // failures and per-call result caps)
+        // last resort: split the range in half (covers per-call result caps)
         const mid = Math.floor((f + t) / 2);
-        const [a, b] = await Promise.all([getBurnLogsRange(f, mid), getBurnLogsRange(mid + 1, t)]);
+        const [a, b] = await Promise.all([getBurnLogsRangeRetry(f, mid), getBurnLogsRangeRetry(mid + 1, t)]);
         return [...a, ...b];
       }
     }));
     for (const logs of results) allLogs.push(...logs);
+    if (from <= endBlock) await sleep(100);
   }
 
   console.log(`[Burn Feed] eth_getLogs scan ${startBlock}-${endBlock}: ${allLogs.length} burn events (chunk size ${chunkSize})`);
@@ -491,7 +510,7 @@ async function fetchBurnTransfersChunked() {
     console.log(`[Burn Feed] No cache — full scan from block ${scanFrom} to ${currentBlock}`);
   }
 
-  let scanComplete = true;
+  let scanError = null;
   if (scanFrom <= currentBlock) {
     try {
       const fresh = (await scanBurnLogs(scanFrom, currentBlock))
@@ -508,15 +527,15 @@ async function fetchBurnTransfersChunked() {
       // so keep serving them and retry the incremental scan next cycle.
       if (!cache) throw e;
       console.log("[Burn Feed] Incremental scan failed, serving cached events:", e.message);
-      scanComplete = false;
+      scanError = e.message;
     }
   }
 
   await resolveTimestamps(events);
-  if (scanComplete) {
+  if (!scanError) {
     storage.set(BURN_CACHE_KEY, JSON.stringify({ token: CTR_ADDRESS.toLowerCase(), scannedTo: currentBlock, events }));
   }
-  return events;
+  return { events, scanError };
 }
 
 // onPartial (optional) is called with explorer results if they arrive
@@ -534,10 +553,14 @@ async function fetchBurnTransfers(onPartial) {
     if (!rpcDone && logs.length > 0 && onPartial) onPartial(logs);
   });
 
-  const rpcEvents = await fetchBurnTransfersChunked().catch(e => {
-    console.log("[Burn Feed] RPC scan failed:", e.message);
-    return null;
-  });
+  let scanError = null;
+  const rpcEvents = await fetchBurnTransfersChunked()
+    .then(r => { scanError = r.scanError; return r.events; })
+    .catch(e => {
+      console.log("[Burn Feed] RPC scan failed:", e.message);
+      scanError = e.message;
+      return null;
+    });
   rpcDone = true;
   const explorerLogs = await explorerPromise;
 
@@ -567,7 +590,7 @@ async function fetchBurnTransfers(onPartial) {
   if (explorerAdded > 0 || !rpcEvents) parts.push(`Explorer: ${rpcEvents ? `+${explorerAdded}` : explorerLogs.length}`);
   const strategy = parts.length > 0 ? parts.join(" + ") : "No data";
 
-  return { logs: merged, strategy };
+  return { logs: merged, strategy, scanError };
 }
 
 function PieChart({ data }) {
@@ -803,6 +826,7 @@ export default function CTRDashboard() {
   const [burnEvents, setBurnEvents] = useState([]);
   const [burnEventsLoading, setBurnEventsLoading] = useState(true);
   const [burnFetchStrategy, setBurnFetchStrategy] = useState("");
+  const [burnScanError, setBurnScanError] = useState(null);
   const [livePrice, setLivePrice] = useState(null);
   const [priceChange24h, setPriceChange24h] = useState(null);
   const [liveMarketCap, setLiveMarketCap] = useState(null);
@@ -1024,7 +1048,7 @@ export default function CTRDashboard() {
 
     const fetchEvents = async () => {
       try {
-        const { logs, strategy } = await fetchBurnTransfers((partialLogs) => {
+        const { logs, strategy, scanError } = await fetchBurnTransfers((partialLogs) => {
           // Explorer results landed while the full RPC chain scan is
           // still running — show them right away
           if (cancelled) return;
@@ -1039,12 +1063,14 @@ export default function CTRDashboard() {
         }
         setBurnEvents(toDisplayEvents(logs || []));
         setBurnFetchStrategy(strategy);
+        setBurnScanError(scanError || null);
         setBurnEventsLoading(false);
       } catch (e) {
         if (cancelled) return;
         console.log("Burn events fetch error:", e);
         setBurnEventsLoading(false);
         setBurnFetchStrategy("Error");
+        setBurnScanError(e.message || String(e));
       }
     };
 
@@ -1729,6 +1755,11 @@ export default function CTRDashboard() {
               </div>
             </div>
           </div>
+          {burnScanError && (
+            <div style={{ padding: "8px 16px", background: "#3d151522", borderBottom: "1px solid #3d1515", fontSize: 11, color: "#ff6b6b", fontFamily: "'DM Mono',monospace" }}>
+              ⚠️ Chain scan failed — list may be incomplete · {burnScanError}
+            </div>
+          )}
           <div style={{ padding: "0 0 8px" }}>
             <div className="burn-feed-row" style={{ borderBottom: "1px solid #243152" }}>
               <div style={{ fontSize: 10, color: "#475569", letterSpacing: ".1em", textTransform: "uppercase" }}>Time</div>
