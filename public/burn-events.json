@@ -1,0 +1,16 @@
+{
+ "token": "0xf3672f0cf2e45b28ac4a1d50fd8ac2eb555c21fc",
+ "burnAddresses": [
+  "0x000000000000000000000000000000000000dead",
+  "0x0000000000000000000000000000000000000000",
+  "0x0000000000000000000000000000000000000001"
+ ],
+ "startBlock": 0,
+ "scannedTo": 0,
+ "complete": false,
+ "updatedAt": null,
+ "eventCount": 0,
+ "totalBurnedWei": "0",
+ "totalBurned": 0,
+ "events": []
+}

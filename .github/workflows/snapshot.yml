@@ -2,12 +2,15 @@ name: Treasury Snapshot
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    # Every 6 hours: the treasury snapshot updates the current day's entry
+    # in place, and the burn index picks up new burns four times a day
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
   snapshot:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     permissions:
       contents: write
 
@@ -23,11 +26,19 @@ jobs:
       - name: Run snapshot script
         run: node scripts/snapshot.js
 
+      # Scans the chain for CTR burns and commits them to
+      # public/burn-events.json, so the site never has to scan the full
+      # history in the browser. Incremental and checkpointed: an aborted
+      # run still moves the index forward and resumes on the next run.
+      - name: Update burn index
+        continue-on-error: true
+        run: node scripts/burn-index.js
+
       - name: Commit & push snapshot
         run: |
           git config user.name "Treasury Bot"
           git config user.email "bot@cronostreasury.github.io"
-          git add public/treasury-history.json
+          git add public/treasury-history.json public/burn-events.json
           git diff --staged --quiet || git commit -m "📸 Daily treasury snapshot $(date +%Y-%m-%d)"
           git push
 

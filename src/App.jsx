@@ -222,28 +222,41 @@ async function getCurrentBlockNumber() {
 // Lists EVERY CTR Transfer whose destination is a dead wallet,
 // from ANY sender.
 //
-// Primary:  Chunked eth_getLogs over the token's full history.
-//           The public Cronos RPC caps the block range per call
-//           (Ethermint default: 10,000 blocks), so the chunk size
-//           adapts until the node accepts it. Results are cached
-//           in localStorage so later visits only scan new blocks.
-// Extra:    cronos.org/explorer/api (Etherscan-compatible), merged
-//           in for anything the RPC scan missed, and shown early
-//           while the first full chain scan is still running.
+// Primary:  public/burn-events.json — a complete index of every burn,
+//           rebuilt in CI by scripts/burn-index.js. Walking the token's
+//           full history takes thousands of eth_getLogs calls; the public
+//           Cronos RPC rate-limits that, so doing it in the browser on
+//           every visit made the scan abort and the feed silently fall
+//           back to incomplete explorer data — most burns went missing.
+// Top-up:   eth_getLogs for the blocks mined since the index was built
+//           (a day at most), cached in localStorage between visits.
+// Extra:    cronos.org/explorer/api (Etherscan-compatible), merged in as
+//           a gap filler and shown early while the top-up runs.
+// Fallback: full in-browser chain scan — only when no index is available.
 // ==========================================
 
-const BURN_CACHE_KEY = "ctr_burn_events_v3";
-const DEPLOY_BLOCK_KEY = "ctr_deploy_block_v1";
-const CHUNK_SIZE_KEY = "ctr_getlogs_chunk_v1";
+const BURN_INDEX_URL = `${import.meta.env.BASE_URL || "/"}burn-events.json`;
+const BURN_CACHE_KEY = "ctr_burn_events_v4";
+const DEPLOY_BLOCK_KEY = "ctr_deploy_block_v2";
+const CHUNK_SIZE_KEY = "ctr_getlogs_chunk_v2";
 // Rescan this many blocks behind the cached tip to survive reorgs
 const REORG_SAFETY_BLOCKS = 128;
+// Never top up more than this from the browser (~2 weeks of Cronos blocks).
+// A bigger gap means the CI index is still being built — scanning it here
+// would hammer the public RPC and fail anyway.
+const MAX_TOPUP_BLOCKS = 250_000;
 
 const storage = {
   get(key) { try { return localStorage.getItem(key); } catch { return null; } },
   set(key, val) { try { localStorage.setItem(key, val); } catch { /* unavailable or full */ } },
+  remove(key) { try { localStorage.removeItem(key); } catch { /* unavailable */ } },
 };
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+const weiToAmount = (wei) => {
+  try { return Number(BigInt(wei ?? 0)) / 1e18; } catch { return 0; }
+};
 
 async function rpcCall(method, params) {
   const res = await fetch(CRONOS_RPC, {
@@ -255,10 +268,46 @@ async function rpcCall(method, params) {
   return res.json();
 }
 
+// The pre-built index: every burn from the token's deploy block up to
+// `scannedTo`, so the browser only has to cover what came after it.
+async function fetchBurnIndex() {
+  try {
+    const res = await fetch(BURN_INDEX_URL, { cache: "no-cache" });
+    if (!res.ok) {
+      console.log(`[Burn Feed] Burn index unavailable (HTTP ${res.status})`);
+      return null;
+    }
+    const data = await res.json();
+    if (data?.token?.toLowerCase() !== CTR_ADDRESS.toLowerCase() || !Array.isArray(data.events)) return null;
+    const scannedTo = Number(data.scannedTo) || 0;
+    if (scannedTo <= 0) {
+      console.log("[Burn Feed] Burn index is empty — falling back to a browser chain scan");
+      return null;
+    }
+    const events = data.events
+      .map(e => ({
+        txHash: e.txHash,
+        logIndex: Number(e.logIndex) || 0,
+        blockNumber: Number(e.blockNumber) || 0,
+        from: (e.from || "").toLowerCase(),
+        to: (e.to || "").toLowerCase(),
+        amount: weiToAmount(e.valueWei),
+        ts: Number(e.ts) || 0,
+      }))
+      .filter(e => e.txHash && e.amount > 0);
+    console.log(`[Burn Feed] Index: ${events.length} burns, blocks ${data.startBlock}–${scannedTo} (built ${data.updatedAt})`);
+    return { startBlock: Number(data.startBlock) || 1, scannedTo, complete: data.complete !== false, events };
+  } catch (e) {
+    console.log("[Burn Feed] Burn index fetch failed:", e.message);
+    return null;
+  }
+}
+
 async function fetchBurnTransfersExplorerForAddress(burnAddress) {
   const allLogs = [];
   const MAX_PAGES = 20;
   const OFFSET = 1000; // Blockscout uses 'offset' as page size (not 'limit')
+  const seenPages = new Set();
 
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = `https://cronos.org/explorer/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&address=${burnAddress}&sort=desc&page=${page}&offset=${OFFSET}`;
@@ -280,6 +329,15 @@ async function fetchBurnTransfersExplorerForAddress(burnAddress) {
       }
 
       const rawCount = data.result.length;
+      // Some Blockscout deployments ignore `page` and keep serving the first
+      // one — stop instead of walking the same rows 20 times
+      const pageKey = `${data.result[0]?.hash}-${data.result[rawCount - 1]?.hash}-${rawCount}`;
+      if (seenPages.has(pageKey)) {
+        console.log(`[Burn Feed] Explorer ${burnAddress.slice(0, 10)}… page ${page} repeats page ${page - 1} — pagination unsupported`);
+        break;
+      }
+      seenPages.add(pageKey);
+
       // The explorer returns txs where the address is sender OR receiver —
       // keep only actual burns (transfers INTO a dead wallet)
       const pageLogs = data.result
@@ -289,7 +347,7 @@ async function fetchBurnTransfersExplorerForAddress(burnAddress) {
           blockNumber: parseInt(tx.blockNumber) || 0,
           from: (tx.from || "").toLowerCase(),
           to: (tx.to || "").toLowerCase(),
-          amount: Number(BigInt(tx.value || "0")) / 1e18,
+          amount: weiToAmount(tx.value || "0"),
           ts: tx.timeStamp ? parseInt(tx.timeStamp) * 1000 : Date.now(),
           logIndex: parseInt(tx.logIndex) || 0,
         }))
@@ -325,26 +383,13 @@ async function fetchBurnTransfersExplorer() {
 }
 
 // Binary-search the block where the CTR contract was deployed so the log
-// scan doesn't start at genesis. Falls back to the earliest CTR transfer
-// known to the explorer, then to block 1.
+// scan doesn't start at genesis. Only used when neither the index nor a
+// cache is available. A pruned node answers "0x" for every historical
+// block, which would place the "deploy block" at its pruning boundary and
+// hide every older burn — so the result is sanity-checked first.
 async function findScanStartBlock(currentBlock) {
   const cached = parseInt(storage.get(DEPLOY_BLOCK_KEY) || "", 10);
   if (Number.isFinite(cached) && cached > 0) return cached;
-
-  try {
-    let lo = 1, hi = currentBlock;
-    while (lo < hi) {
-      const mid = Math.floor((lo + hi) / 2);
-      const json = await rpcCall("eth_getCode", [CTR_ADDRESS, "0x" + mid.toString(16)]);
-      if (json.error) throw new Error(json.error.message || "eth_getCode failed");
-      if (json.result && json.result !== "0x") hi = mid; else lo = mid + 1;
-    }
-    console.log(`[Burn Feed] CTR deploy block found via eth_getCode: ${lo}`);
-    storage.set(DEPLOY_BLOCK_KEY, String(lo));
-    return lo;
-  } catch (e) {
-    console.log("[Burn Feed] Deploy block binary search failed:", e.message);
-  }
 
   try {
     const url = `https://cronos.org/explorer/api?module=account&action=tokentx&contractaddress=${CTR_ADDRESS}&sort=asc&page=1&offset=1`;
@@ -358,6 +403,26 @@ async function findScanStartBlock(currentBlock) {
     }
   } catch (e) {
     console.log("[Burn Feed] Explorer deploy block lookup failed:", e.message);
+  }
+
+  try {
+    const head = await rpcCall("eth_getCode", [CTR_ADDRESS, "latest"]);
+    const genesis = await rpcCall("eth_getCode", [CTR_ADDRESS, "0x1"]);
+    if (head.error || !head.result || head.result === "0x") throw new Error("no code at head");
+    if (genesis.result && genesis.result !== "0x") throw new Error("node reports code at block 1 — history unreliable");
+
+    let lo = 1, hi = currentBlock;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      const json = await rpcCall("eth_getCode", [CTR_ADDRESS, "0x" + mid.toString(16)]);
+      if (json.error) throw new Error(json.error.message || "eth_getCode failed");
+      if (json.result && json.result !== "0x") hi = mid; else lo = mid + 1;
+    }
+    console.log(`[Burn Feed] CTR deploy block found via eth_getCode: ${lo}`);
+    storage.set(DEPLOY_BLOCK_KEY, String(lo));
+    return lo;
+  } catch (e) {
+    console.log("[Burn Feed] Deploy block binary search failed:", e.message);
   }
 
   console.log("[Burn Feed] No deploy block hint — scanning from genesis");
@@ -403,33 +468,39 @@ async function getBurnLogsRangeRetry(fromBlock, toBlock) {
   }
 }
 
+// Scans [startBlock, endBlock] in order. Returns how far it got: ranges are
+// only reported as scanned once every earlier batch succeeded, so a partial
+// result is always a complete prefix — never a list with holes in it.
 async function scanBurnLogs(startBlock, endBlock) {
   const allLogs = [];
   let chunkSize = parseInt(storage.get(CHUNK_SIZE_KEY) || "", 10);
-  if (!Number.isFinite(chunkSize) || chunkSize < 1000) chunkSize = 500_000;
+  if (!Number.isFinite(chunkSize) || chunkSize < 1000) chunkSize = 10_000;
   let from = startBlock;
+  let scannedTo = startBlock - 1;
+  let error = null;
 
-  // Phase 1: learn a chunk size the node accepts (public Cronos RPC caps
-  // the range; the old fixed 500k chunks made every request fail silently)
+  // Phase 1: learn a chunk size the node accepts (the public Cronos RPC
+  // caps the range; fixed 500k chunks made every request fail)
   for (let attempts = 0; from <= endBlock; attempts++) {
     const to = Math.min(from + chunkSize - 1, endBlock);
     try {
       allLogs.push(...await getBurnLogsRangeRetry(from, to));
+      scannedTo = to;
       from = to + 1;
       break;
     } catch (e) {
-      if (attempts > 25) throw new Error("eth_getLogs keeps failing: " + e.message);
+      if (attempts > 25) return { logs: allLogs, scannedTo, error: e.message };
       const hint = parseRangeCapHint(e.message);
       const next = hint && hint < chunkSize ? hint : Math.floor(chunkSize / 2);
       console.log(`[Burn Feed] getLogs range ${chunkSize} rejected (${e.message}) — trying ${next}`);
-      if (next < 500) throw new Error("eth_getLogs rejected even small ranges: " + e.message);
+      if (next < 500) return { logs: allLogs, scannedTo, error: e.message };
       chunkSize = next;
     }
   }
   storage.set(CHUNK_SIZE_KEY, String(chunkSize));
 
   // Phase 2: scan the rest in small parallel batches (kept low to stay
-  // under the public RPC's rate limits during the one-time full scan)
+  // under the public RPC's rate limits)
   const PARALLEL = 3;
   while (from <= endBlock) {
     const ranges = [];
@@ -438,22 +509,29 @@ async function scanBurnLogs(startBlock, endBlock) {
       ranges.push([from, to]);
       from = to + 1;
     }
-    const results = await Promise.all(ranges.map(async ([f, t]) => {
-      try {
-        return await getBurnLogsRangeRetry(f, t);
-      } catch {
-        // last resort: split the range in half (covers per-call result caps)
-        const mid = Math.floor((f + t) / 2);
-        const [a, b] = await Promise.all([getBurnLogsRangeRetry(f, mid), getBurnLogsRangeRetry(mid + 1, t)]);
-        return [...a, ...b];
-      }
-    }));
-    for (const logs of results) allLogs.push(...logs);
+    try {
+      const results = await Promise.all(ranges.map(async ([f, t]) => {
+        try {
+          return await getBurnLogsRangeRetry(f, t);
+        } catch {
+          // last resort: split the range in half (covers per-call result caps)
+          const mid = Math.floor((f + t) / 2);
+          const [a, b] = await Promise.all([getBurnLogsRangeRetry(f, mid), getBurnLogsRangeRetry(mid + 1, t)]);
+          return [...a, ...b];
+        }
+      }));
+      for (const logs of results) allLogs.push(...logs);
+      scannedTo = ranges[ranges.length - 1][1];
+    } catch (e) {
+      // Keep the prefix we already have instead of dropping the whole scan
+      console.log(`[Burn Feed] Scan stopped at block ${ranges[0][0]}:`, e.message);
+      return { logs: allLogs, scannedTo, error: e.message };
+    }
     if (from <= endBlock) await sleep(100);
   }
 
   console.log(`[Burn Feed] eth_getLogs scan ${startBlock}-${endBlock}: ${allLogs.length} burn events (chunk size ${chunkSize})`);
-  return allLogs;
+  return { logs: allLogs, scannedTo, error };
 }
 
 function normalizeRpcLog(log) {
@@ -463,7 +541,7 @@ function normalizeRpcLog(log) {
     blockHex: log.blockNumber,
     from: ("0x" + log.topics[1].slice(26)).toLowerCase(),
     to: ("0x" + log.topics[2].slice(26)).toLowerCase(),
-    amount: Number(BigInt(log.data)) / 1e18,
+    amount: weiToAmount(log.data),
     logIndex: parseInt(log.logIndex, 16),
     ts: 0,
   };
@@ -472,7 +550,8 @@ function normalizeRpcLog(log) {
 function loadBurnCache() {
   try {
     const c = JSON.parse(storage.get(BURN_CACHE_KEY) || "null");
-    if (c && c.token === CTR_ADDRESS.toLowerCase() && Array.isArray(c.events) && Number.isFinite(c.scannedTo)) return c;
+    if (c && c.token === CTR_ADDRESS.toLowerCase() && Array.isArray(c.events)
+        && Number.isFinite(c.scannedTo) && Number.isFinite(c.startBlock)) return c;
   } catch { /* corrupt cache */ }
   return null;
 }
@@ -497,52 +576,87 @@ async function resolveTimestamps(events) {
   }
 }
 
-async function fetchBurnTransfersChunked() {
+// Picks the most complete known-good starting point (CI index vs. the cache
+// left by an earlier visit) and only scans the blocks after it.
+async function fetchBurnTransfersChunked(index) {
   const currentBlock = await getCurrentBlockNumber();
   const cache = loadBurnCache();
-  const events = cache ? cache.events : [];
-  let scanFrom;
-  if (cache) {
-    scanFrom = Math.max(Math.min(cache.scannedTo + 1, currentBlock) - REORG_SAFETY_BLOCKS, 1);
-    console.log(`[Burn Feed] Cache: ${events.length} events up to block ${cache.scannedTo} — rescanning from ${scanFrom}`);
+
+  // The index is authoritative: it is complete from its startBlock and is
+  // rebuilt in CI. It only loses to a cache that starts at least as early
+  // and has already been topped up past it.
+  let baseline = null;
+  if (index && (!cache || cache.startBlock > index.startBlock || cache.scannedTo < index.scannedTo)) {
+    baseline = { ...index, source: "index" };
+  } else if (cache) {
+    baseline = { startBlock: cache.startBlock, scannedTo: cache.scannedTo, events: cache.events, source: "cache" };
+  }
+
+  const events = baseline ? baseline.events.map(e => ({ ...e })) : [];
+  let startBlock, scanFrom;
+  let gapped = false;
+
+  if (baseline) {
+    startBlock = baseline.startBlock;
+    scanFrom = Math.max(startBlock, Math.min(baseline.scannedTo + 1, currentBlock) - REORG_SAFETY_BLOCKS);
+    if (currentBlock - scanFrom > MAX_TOPUP_BLOCKS) {
+      // The index is far behind (CI still building it) — cover what we can
+      // and stay honest about the hole rather than pretending it's complete
+      scanFrom = currentBlock - MAX_TOPUP_BLOCKS;
+      gapped = true;
+      console.log(`[Burn Feed] ${baseline.source} is ${currentBlock - baseline.scannedTo} blocks behind — topping up only the last ${MAX_TOPUP_BLOCKS}`);
+    } else {
+      console.log(`[Burn Feed] Baseline: ${baseline.source} · ${events.length} events up to block ${baseline.scannedTo} — topping up from ${scanFrom}`);
+    }
   } else {
-    scanFrom = await findScanStartBlock(currentBlock);
-    console.log(`[Burn Feed] No cache — full scan from block ${scanFrom} to ${currentBlock}`);
+    startBlock = await findScanStartBlock(currentBlock);
+    scanFrom = startBlock;
+    console.log(`[Burn Feed] No index or cache — full browser scan from block ${scanFrom} to ${currentBlock}`);
   }
 
   let scanError = null;
+  let scannedTo = baseline ? baseline.scannedTo : startBlock - 1;
+
   if (scanFrom <= currentBlock) {
-    try {
-      const fresh = (await scanBurnLogs(scanFrom, currentBlock))
-        .map(normalizeRpcLog)
-        .filter(l => l.amount > 0);
-      const seen = new Set(events.map(e => `${e.txHash.toLowerCase()}-${e.logIndex}`));
-      for (const l of fresh) {
-        const key = `${l.txHash.toLowerCase()}-${l.logIndex}`;
-        if (!seen.has(key)) { events.push(l); seen.add(key); }
-      }
-    } catch (e) {
-      // Without a cache a partial scan is useless (it would hide older
-      // burns) — but cached events are complete up to cache.scannedTo,
-      // so keep serving them and retry the incremental scan next cycle.
-      if (!cache) throw e;
-      console.log("[Burn Feed] Incremental scan failed, serving cached events:", e.message);
-      scanError = e.message;
+    const result = await scanBurnLogs(scanFrom, currentBlock);
+    scanError = result.error;
+    if (!gapped && result.scannedTo >= scanFrom) scannedTo = Math.max(scannedTo, result.scannedTo);
+
+    const fresh = result.logs.map(normalizeRpcLog).filter(l => l.amount > 0);
+    const seen = new Set(events.map(e => `${e.txHash.toLowerCase()}-${e.logIndex}`));
+    for (const l of fresh) {
+      const key = `${l.txHash.toLowerCase()}-${l.logIndex}`;
+      if (!seen.has(key)) { events.push(l); seen.add(key); }
     }
   }
 
   await resolveTimestamps(events);
-  if (!scanError) {
-    storage.set(BURN_CACHE_KEY, JSON.stringify({ token: CTR_ADDRESS.toLowerCase(), scannedTo: currentBlock, events }));
+
+  // Only cache a contiguous, hole-free result — a cached gap would be
+  // served forever, which is how burns went missing in the first place
+  if (!scanError && !gapped && scannedTo >= startBlock) {
+    storage.set(BURN_CACHE_KEY, JSON.stringify({
+      token: CTR_ADDRESS.toLowerCase(),
+      startBlock,
+      scannedTo,
+      events: events.map(e => ({
+        txHash: e.txHash, logIndex: e.logIndex, blockNumber: e.blockNumber,
+        from: e.from, to: e.to, amount: e.amount, ts: e.ts,
+      })),
+    }));
   }
-  return { events, scanError };
+
+  return { events, scanError, incomplete: Boolean(scanError || gapped), baseline: baseline?.source || "chain scan" };
 }
 
-// onPartial (optional) is called with explorer results if they arrive
-// while the full RPC chain scan is still running, so the feed can render
-// early instead of waiting for the first complete scan.
+// onPartial (optional) is called with the index / explorer results as soon
+// as they arrive, so the feed renders immediately instead of waiting for
+// the top-up scan.
 async function fetchBurnTransfers(onPartial) {
-  console.log("[Burn Feed] Fetching from Cronos RPC (full scan) and Explorer API in parallel...");
+  console.log("[Burn Feed] Loading burn index + Explorer API, then topping up from the RPC...");
+
+  const index = await fetchBurnIndex();
+  if (index && index.events.length > 0 && onPartial) onPartial(index.events, "index");
 
   let rpcDone = false;
   const explorerPromise = fetchBurnTransfersExplorer().catch(e => {
@@ -550,24 +664,32 @@ async function fetchBurnTransfers(onPartial) {
     return [];
   });
   explorerPromise.then(logs => {
-    if (!rpcDone && logs.length > 0 && onPartial) onPartial(logs);
+    if (!rpcDone && !index && logs.length > 0 && onPartial) onPartial(logs, "explorer");
   });
 
   let scanError = null;
-  const rpcEvents = await fetchBurnTransfersChunked()
-    .then(r => { scanError = r.scanError; return r.events; })
+  let incomplete = false;
+  let baselineSource = "chain scan";
+  const rpcEvents = await fetchBurnTransfersChunked(index)
+    .then(r => {
+      scanError = r.scanError;
+      incomplete = r.incomplete;
+      baselineSource = r.baseline;
+      return r.events;
+    })
     .catch(e => {
-      console.log("[Burn Feed] RPC scan failed:", e.message);
+      console.log("[Burn Feed] RPC top-up failed:", e.message);
       scanError = e.message;
-      return null;
+      incomplete = true;
+      return index ? index.events : null;
     });
   rpcDone = true;
   const explorerLogs = await explorerPromise;
 
-  console.log(`[Burn Feed] RPC: ${rpcEvents ? rpcEvents.length : "failed"} | Explorer: ${explorerLogs.length}`);
+  console.log(`[Burn Feed] Base ${baselineSource}: ${rpcEvents ? rpcEvents.length : "failed"} | Explorer: ${explorerLogs.length}`);
 
-  // The RPC scan is authoritative: it contains every log of every tx it
-  // covers. Explorer entries only fill in txs the scan doesn't know at all
+  // The index + RPC scan are authoritative: they contain every log of every
+  // tx they cover. Explorer entries only fill in txs they don't know at all
   // (their logIndex is unreliable, so txHash is the merge key).
   const merged = rpcEvents ? [...rpcEvents] : [];
   const rpcTxs = new Set(merged.map(e => e.txHash.toLowerCase()));
@@ -586,11 +708,12 @@ async function fetchBurnTransfers(onPartial) {
   console.log(`[Burn Feed] ✅ Merged: ${merged.length} unique events (${explorerAdded} explorer-only)`);
 
   const parts = [];
-  if (rpcEvents) parts.push(`RPC scan: ${rpcEvents.length}`);
-  if (explorerAdded > 0 || !rpcEvents) parts.push(`Explorer: ${rpcEvents ? `+${explorerAdded}` : explorerLogs.length}`);
+  if (index) parts.push(`index: ${index.events.length}`);
+  if (rpcEvents) parts.push(index ? `chain top-up: ${rpcEvents.length - index.events.length}` : `chain scan: ${rpcEvents.length}`);
+  if (explorerAdded > 0 || !rpcEvents) parts.push(`explorer: ${rpcEvents ? `+${explorerAdded}` : explorerLogs.length}`);
   const strategy = parts.length > 0 ? parts.join(" + ") : "No data";
 
-  return { logs: merged, strategy, scanError };
+  return { logs: merged, strategy, scanError, incomplete };
 }
 
 function PieChart({ data }) {
@@ -827,6 +950,7 @@ export default function CTRDashboard() {
   const [burnEventsLoading, setBurnEventsLoading] = useState(true);
   const [burnFetchStrategy, setBurnFetchStrategy] = useState("");
   const [burnScanError, setBurnScanError] = useState(null);
+  const [burnIncomplete, setBurnIncomplete] = useState(false);
   const [livePrice, setLivePrice] = useState(null);
   const [priceChange24h, setPriceChange24h] = useState(null);
   const [liveMarketCap, setLiveMarketCap] = useState(null);
@@ -1048,12 +1172,12 @@ export default function CTRDashboard() {
 
     const fetchEvents = async () => {
       try {
-        const { logs, strategy, scanError } = await fetchBurnTransfers((partialLogs) => {
-          // Explorer results landed while the full RPC chain scan is
-          // still running — show them right away
+        const { logs, strategy, scanError, incomplete } = await fetchBurnTransfers((partialLogs, source) => {
+          // The index (or explorer) landed while the top-up scan is still
+          // running — show those burns right away
           if (cancelled) return;
           setBurnEvents(toDisplayEvents(partialLogs));
-          setBurnFetchStrategy("Explorer · full chain scan running…");
+          setBurnFetchStrategy(source === "index" ? "index · checking for newer burns…" : "explorer · chain scan running…");
           setBurnEventsLoading(false);
         });
         if (cancelled) return;
@@ -1064,6 +1188,7 @@ export default function CTRDashboard() {
         setBurnEvents(toDisplayEvents(logs || []));
         setBurnFetchStrategy(strategy);
         setBurnScanError(scanError || null);
+        setBurnIncomplete(Boolean(incomplete));
         setBurnEventsLoading(false);
       } catch (e) {
         if (cancelled) return;
@@ -1071,6 +1196,7 @@ export default function CTRDashboard() {
         setBurnEventsLoading(false);
         setBurnFetchStrategy("Error");
         setBurnScanError(e.message || String(e));
+        setBurnIncomplete(true);
       }
     };
 
@@ -1104,6 +1230,10 @@ export default function CTRDashboard() {
   const changePrefix = displayChange >= 0 ? "+" : "";
 
   const totalBurnedFromEvents = burnEvents.reduce((s, e) => s + e.amount, 0);
+  // Burns the feed does not account for — the on-chain total is the truth,
+  // so a gap means the list is missing transactions and should say so
+  const unlistedBurned = burnedAmount > 0 ? burnedAmount - totalBurnedFromEvents : 0;
+  const burnFeedHasGap = burnedAmount > 0 && unlistedBurned / burnedAmount > 0.01;
 
   return (
     <div style={{ minHeight: "100vh", background: "#020408", color: "#e2e8f0", fontFamily: "system-ui, sans-serif", position: "relative" }}>
@@ -1755,9 +1885,14 @@ export default function CTRDashboard() {
               </div>
             </div>
           </div>
-          {burnScanError && (
+          {(burnScanError || burnIncomplete) && (
             <div style={{ padding: "8px 16px", background: "#3d151522", borderBottom: "1px solid #3d1515", fontSize: 11, color: "#ff6b6b", fontFamily: "'DM Mono',monospace" }}>
-              ⚠️ Chain scan failed — list may be incomplete · {burnScanError}
+              ⚠️ Chain scan incomplete — list may be missing burns{burnScanError ? ` · ${burnScanError}` : ""}
+            </div>
+          )}
+          {!burnEventsLoading && burnFeedHasGap && (
+            <div style={{ padding: "8px 16px", background: "#3d2a1522", borderBottom: "1px solid #3d2a15", fontSize: 11, color: "#f59e0b", fontFamily: "'DM Mono',monospace" }}>
+              ⚠️ {fmtCompact(unlistedBurned)} CTR of the {fmtCompact(burnedAmount)} CTR burned on-chain are not in this list yet — the burn index is still catching up
             </div>
           )}
           <div style={{ padding: "0 0 8px" }}>
