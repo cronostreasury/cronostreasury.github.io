@@ -6,13 +6,22 @@
   "0x0000000000000000000000000000000000000001"
  ],
  "startBlock": 57417829,
- "scannedTo": 78849428,
+ "scannedTo": 82185228,
  "complete": false,
- "updatedAt": "2026-08-07T13:14:12.835Z",
- "eventCount": 14,
- "totalBurnedWei": "5475537746287978290345848",
- "totalBurned": 5475537.746287978,
+ "updatedAt": "2026-08-07T19:08:53.122Z",
+ "eventCount": 15,
+ "totalBurnedWei": "8550106746287978290345848",
+ "totalBurned": 8550106.74628798,
  "events": [
+  {
+   "txHash": "0xf598a7f8f6bfacfecf3c159a844d4bc8d52799080037e924b96696f7fe17340d",
+   "logIndex": 15,
+   "blockNumber": 80377350,
+   "from": "0x96a6cd06338efe754f200aba9ff07788c16e5f20",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "3074569000000000000000000",
+   "ts": 0
+  },
   {
    "txHash": "0x3fd5a3c11be462b67277042bd05e67db1f9b87f465a547b5fe9e62a543e8d2d3",
    "logIndex": 0,
