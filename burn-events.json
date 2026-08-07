@@ -6,13 +6,31 @@
   "0x0000000000000000000000000000000000000001"
  ],
  "startBlock": 57417829,
- "scannedTo": 68385828,
+ "scannedTo": 77913628,
  "complete": false,
- "updatedAt": "2026-08-07T03:10:23.731Z",
- "eventCount": 12,
- "totalBurnedWei": "4319713001179047870595795",
- "totalBurned": 4319713.001179048,
+ "updatedAt": "2026-08-07T07:38:52.007Z",
+ "eventCount": 14,
+ "totalBurnedWei": "5475537746287978290345848",
+ "totalBurned": 5475537.746287978,
  "events": [
+  {
+   "txHash": "0x3fd5a3c11be462b67277042bd05e67db1f9b87f465a547b5fe9e62a543e8d2d3",
+   "logIndex": 0,
+   "blockNumber": 74647912,
+   "from": "0x96a6cd06338efe754f200aba9ff07788c16e5f20",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "1051324000000000000000000",
+   "ts": 0
+  },
+  {
+   "txHash": "0xd9a74a487bbe67f205a4287d1eec93448a33126b3cad4e702e9f368ff84a58f3",
+   "logIndex": 1,
+   "blockNumber": 72401854,
+   "from": "0xdc04a03ecdd75b4321c57fa63bbbd661ce771e9f",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "104500745108930419750053",
+   "ts": 0
+  },
   {
    "txHash": "0x0de6c1a1999360611b7c8ffa03b62a5085dd4cfdb407a9ea7bf23d4e6935c679",
    "logIndex": 1,
