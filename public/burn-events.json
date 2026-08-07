@@ -5,12 +5,121 @@
   "0x0000000000000000000000000000000000000000",
   "0x0000000000000000000000000000000000000001"
  ],
- "startBlock": 0,
- "scannedTo": 0,
+ "startBlock": 57417829,
+ "scannedTo": 68385828,
  "complete": false,
- "updatedAt": null,
- "eventCount": 0,
- "totalBurnedWei": "0",
- "totalBurned": 0,
- "events": []
+ "updatedAt": "2026-08-07T03:10:23.731Z",
+ "eventCount": 12,
+ "totalBurnedWei": "4319713001179047870595795",
+ "totalBurned": 4319713.001179048,
+ "events": [
+  {
+   "txHash": "0x0de6c1a1999360611b7c8ffa03b62a5085dd4cfdb407a9ea7bf23d4e6935c679",
+   "logIndex": 1,
+   "blockNumber": 65388255,
+   "from": "0xdad367a6655f9e588c05e23ff4b0d4917824fbc7",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "225000000000000000000000",
+   "ts": 1776193944000
+  },
+  {
+   "txHash": "0xf82fb0a7c597496775a4b4664492b4b322ec2de22299103e69d0afebfad71f29",
+   "logIndex": 0,
+   "blockNumber": 65035562,
+   "from": "0x96a6cd06338efe754f200aba9ff07788c16e5f20",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "72000000000000000000000",
+   "ts": 1776024496000
+  },
+  {
+   "txHash": "0xd42de01e0a2d564bc975df2a5021997023bfcf654eb2056537e3d3f68bf90066",
+   "logIndex": 0,
+   "blockNumber": 62728816,
+   "from": "0x96a6cd06338efe754f200aba9ff07788c16e5f20",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "71912000000000000000000",
+   "ts": 1774940745000
+  },
+  {
+   "txHash": "0x9aafb0803b8b3d44cafb75ab78301f61823e342f3546f2d1069afd3a51399b83",
+   "logIndex": 0,
+   "blockNumber": 62410866,
+   "from": "0x96a6cd06338efe754f200aba9ff07788c16e5f20",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "454481000000000000000000",
+   "ts": 1774795234000
+  },
+  {
+   "txHash": "0x6365ebf879f78aa2ca5496f9023e749d76e23fd7c6ad459f66d1d28c693563e3",
+   "logIndex": 0,
+   "blockNumber": 61478995,
+   "from": "0x96a6cd06338efe754f200aba9ff07788c16e5f20",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "2000000000000000000000000",
+   "ts": 1774369658000
+  },
+  {
+   "txHash": "0x13f4b8ebc9e0530748ee99646f82872bc088c29a7e09a8e2e5dd3a51bea20fe8",
+   "logIndex": 0,
+   "blockNumber": 61066508,
+   "from": "0x96a6cd06338efe754f200aba9ff07788c16e5f20",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "64820000000000000000000",
+   "ts": 1774175169000
+  },
+  {
+   "txHash": "0xa2a4f9a652ee5a55165f16c264143df69fa7a3af8f1c57bdbf590d1e5784c19f",
+   "logIndex": 1,
+   "blockNumber": 60485213,
+   "from": "0xd3ef72e596664443f9368eabc28bea282fc49dfc",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "900000000000000000000000",
+   "ts": 1773898928000
+  },
+  {
+   "txHash": "0xac60e87a0367515bf50d6ae4da0caf179da594696b566e78c0f4d92eeb4cccd5",
+   "logIndex": 1,
+   "blockNumber": 60476096,
+   "from": "0x0917c9ed6909fa57df412647a99778b1fe64b8bd",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "13500000000000000000000",
+   "ts": 1773894537000
+  },
+  {
+   "txHash": "0x0b303f436d9693e0a40b95df120ac51dbd842ba8d6b6d3d3c361a46e71ade942",
+   "logIndex": 1,
+   "blockNumber": 60452646,
+   "from": "0x2816bca1667f2cf5978307154e4c42ab1e187ad5",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "270000000000000000000000",
+   "ts": 1773883478000
+  },
+  {
+   "txHash": "0xf2a07ab3f0e4399050fe23d3706b9f1f6f334fe09f4a5940d29b18e00dfad233",
+   "logIndex": 1,
+   "blockNumber": 60444715,
+   "from": "0x7614a361217fcfe9a7f5cb8d950b40514d7b45aa",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "135000000000000000000000",
+   "ts": 1773879714000
+  },
+  {
+   "txHash": "0x08b3e90d91d7d4340b6a47034b6bc3beb0f4f19e099a71f2991a6008921169bd",
+   "logIndex": 0,
+   "blockNumber": 60423295,
+   "from": "0x96a6cd06338efe754f200aba9ff07788c16e5f20",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "113000000000000000000000",
+   "ts": 1773869848000
+  },
+  {
+   "txHash": "0x0bda627393b59350f0162b3f79923a7e02d698b39cf597fb54fc1a1dc0adfc6a",
+   "logIndex": 1,
+   "blockNumber": 59093155,
+   "from": "0x996af0aa10f670d9a405aae5738553ffa95ca3c0",
+   "to": "0x000000000000000000000000000000000000dead",
+   "valueWei": "1179047870595795",
+   "ts": 1773248493000
+  }
+ ]
 }
