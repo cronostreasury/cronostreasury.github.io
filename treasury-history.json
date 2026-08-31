@@ -6835,5 +6835,46 @@
         "value": 104.5047355
       }
     }
+  },
+  {
+    "date": "2026-08-31",
+    "tvl": 699.55,
+    "holdings": {
+      "CDCBTC": {
+        "amount": 0.04222118,
+        "price": 0,
+        "value": 0
+      },
+      "CDCETH": {
+        "amount": 0.6116091079608992,
+        "price": 0,
+        "value": 0
+      },
+      "LCRO": {
+        "amount": 26430.272727140615,
+        "price": 0,
+        "value": 0
+      },
+      "USDC": {
+        "amount": 699.546507,
+        "price": 1,
+        "value": 699.546507
+      },
+      "PACK": {
+        "amount": 0,
+        "price": 0,
+        "value": 0
+      },
+      "CTR": {
+        "amount": 253418814.06453383,
+        "price": 0,
+        "value": 0
+      },
+      "PACK_STAKED": {
+        "amount": 1393025,
+        "price": 0,
+        "value": 0
+      }
+    }
   }
 ]
