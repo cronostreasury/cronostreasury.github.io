@@ -262,6 +262,13 @@
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 }
 
+/* Grid items default to min-width: auto, which lets a child with its own
+   intrinsic minimum (e.g. .cronos-movers' own minmax()) force the column
+   — and the whole page — wider than the viewport. Let items shrink. */
+.cronos-grid > * {
+  min-width: 0;
+}
+
 .cronos-card {
   background: var(--cr-bg-elevated);
   border: 1px solid var(--cr-border);

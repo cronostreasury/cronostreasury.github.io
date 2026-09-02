@@ -174,7 +174,7 @@ export default function OverviewPage() {
             <ProtocolTable protocols={withShare.slice(0, TOP_PROTOCOL_PREVIEW)} volumeMap={volumeMap} showVolume showShare />
           </section>
 
-          <section className="cronos-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+          <section className="cronos-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             <div className="cronos-card">
               <div className="cronos-card-label">TVL by Category</div>
               <div style={{ marginTop: 12 }}>

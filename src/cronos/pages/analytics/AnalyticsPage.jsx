@@ -119,7 +119,7 @@ export default function AnalyticsPage() {
             </div>
           </section>
 
-          <section className="cronos-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+          <section className="cronos-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             <div className="cronos-card">
               <div className="cronos-card-head">
                 <span className="cronos-card-label">Chain DEX Volume History</span>
@@ -146,7 +146,7 @@ export default function AnalyticsPage() {
             </div>
           </section>
 
-          <section className="cronos-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+          <section className="cronos-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             <div className="cronos-card">
               <div className="cronos-card-label">TVL by Category</div>
               <div style={{ marginTop: 12 }}>
@@ -160,7 +160,7 @@ export default function AnalyticsPage() {
             </div>
           </section>
 
-          <section className="cronos-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+          <section className="cronos-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             <div className="cronos-card">
               <div className="cronos-card-label">Momentum — Top Gainers (24h)</div>
               <div style={{ marginTop: 12 }}>
