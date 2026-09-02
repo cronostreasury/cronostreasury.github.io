@@ -1,0 +1,72 @@
+/* Design tokens shared by every page in the Cronos dashboard suite. */
+
+:root {
+  color-scheme: dark;
+
+  --cr-bg: #06090f;
+  --cr-bg-elevated: #0c1220;
+  --cr-bg-elevated-2: #10182b;
+  --cr-bg-hover: #141d33;
+
+  --cr-border: #243152;
+  --cr-border-soft: rgba(36, 49, 82, 0.55);
+
+  --cr-text: #e2e8f0;
+  --cr-text-dim: #94a3b8;
+  --cr-text-faint: #475569;
+
+  --cr-accent: #64ffda;
+  --cr-accent-dim: rgba(100, 255, 218, 0.14);
+  --cr-accent-2: #7dd3fc;
+
+  --cr-up: #4ade80;
+  --cr-down: #ff6b6b;
+  --cr-flat: #64748b;
+
+  --cr-radius: 12px;
+  --cr-radius-sm: 8px;
+
+  --cr-font-mono: "DM Mono", "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --cr-font-display: "Syne", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --cr-dur-fast: 150ms;
+  --cr-dur-med: 420ms;
+  --cr-dur-slow: 900ms;
+  --cr-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--cr-bg);
+  color: var(--cr-text);
+  font-family: var(--cr-font-mono);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* MPA cross-document view transitions: supporting browsers get a soft
+   cross-fade when navigating between /cronos/* pages; everywhere else
+   this rule is simply ignored and navigation works as normal. */
+@view-transition {
+  navigation: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
