@@ -1,0 +1,1 @@
+import{j as m}from"./client-DXGOEjUc.js";function o({width:r="100%",height:s=16,style:e,className:i=""}){return m.jsx("div",{className:`cronos-shimmer ${i}`,style:{width:r,height:s,...e},"aria-hidden":"true"})}export{o as S};

@@ -1,0 +1,1 @@
+import{j as s}from"./client-DXGOEjUc.js";const n={live:"Live",partial:"Partial",unavailable:"Unavailable"};function l({status:a}){const e=n[a]?a:"unavailable";return s.jsxs("span",{className:`cronos-badge cronos-badge--${e}`,children:[s.jsx("span",{className:"cronos-badge-dot"}),n[e]]})}export{l as D};
