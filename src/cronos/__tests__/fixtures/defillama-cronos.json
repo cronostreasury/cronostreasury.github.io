@@ -1,0 +1,681 @@
+{
+  "_meta": {
+    "source": "https://api.llama.fi (DeFiLlama public API)",
+    "capturedAt": "2026-09-02T17:58:23.789512Z",
+    "note": "Frozen real snapshot for deterministic unit tests only \u2014 the live dashboard always fetches current data at runtime."
+  },
+  "chainsResponse": [
+    {
+      "gecko_id": "crypto-com-chain",
+      "tvl": 258763396.00100932,
+      "tokenSymbol": "CRO",
+      "cmcId": "3635",
+      "name": "Cronos",
+      "chainId": 25
+    }
+  ],
+  "historyResponse": [
+    {
+      "date": 1778025600,
+      "tvl": 298415392
+    },
+    {
+      "date": 1778112000,
+      "tvl": 299925820
+    },
+    {
+      "date": 1778198400,
+      "tvl": 296722210
+    },
+    {
+      "date": 1778284800,
+      "tvl": 299094276
+    },
+    {
+      "date": 1778371200,
+      "tvl": 298264827
+    },
+    {
+      "date": 1778457600,
+      "tvl": 303897393
+    },
+    {
+      "date": 1778544000,
+      "tvl": 306583564
+    },
+    {
+      "date": 1778630400,
+      "tvl": 307089886
+    },
+    {
+      "date": 1778716800,
+      "tvl": 298602199
+    },
+    {
+      "date": 1778803200,
+      "tvl": 301532922
+    },
+    {
+      "date": 1778889600,
+      "tvl": 296611850
+    },
+    {
+      "date": 1778976000,
+      "tvl": 293168188
+    },
+    {
+      "date": 1779062400,
+      "tvl": 290560260
+    },
+    {
+      "date": 1779148800,
+      "tvl": 291371318
+    },
+    {
+      "date": 1779235200,
+      "tvl": 288852964
+    },
+    {
+      "date": 1779321600,
+      "tvl": 289661192
+    },
+    {
+      "date": 1779408000,
+      "tvl": 290728771
+    },
+    {
+      "date": 1779494400,
+      "tvl": 287134276
+    },
+    {
+      "date": 1779580800,
+      "tvl": 291042472
+    },
+    {
+      "date": 1779667200,
+      "tvl": 288706732
+    },
+    {
+      "date": 1779753600,
+      "tvl": 289202172
+    },
+    {
+      "date": 1779840000,
+      "tvl": 287634620
+    },
+    {
+      "date": 1779926400,
+      "tvl": 285687335
+    },
+    {
+      "date": 1780012800,
+      "tvl": 283884594
+    },
+    {
+      "date": 1780099200,
+      "tvl": 284356288
+    },
+    {
+      "date": 1780185600,
+      "tvl": 285300786
+    },
+    {
+      "date": 1780272000,
+      "tvl": 284279425
+    },
+    {
+      "date": 1780358400,
+      "tvl": 281105113
+    },
+    {
+      "date": 1780444800,
+      "tvl": 274814795
+    },
+    {
+      "date": 1780531200,
+      "tvl": 272557686
+    },
+    {
+      "date": 1780617600,
+      "tvl": 271053394
+    },
+    {
+      "date": 1780704000,
+      "tvl": 265210768
+    },
+    {
+      "date": 1780790400,
+      "tvl": 266138482
+    },
+    {
+      "date": 1780876800,
+      "tvl": 270560307
+    },
+    {
+      "date": 1780963200,
+      "tvl": 271259529
+    },
+    {
+      "date": 1781049600,
+      "tvl": 268575990
+    },
+    {
+      "date": 1781136000,
+      "tvl": 267468464
+    },
+    {
+      "date": 1781222400,
+      "tvl": 270469861
+    },
+    {
+      "date": 1781308800,
+      "tvl": 268311382
+    },
+    {
+      "date": 1781395200,
+      "tvl": 270179992
+    },
+    {
+      "date": 1781481600,
+      "tvl": 274833005
+    },
+    {
+      "date": 1781568000,
+      "tvl": 274114577
+    },
+    {
+      "date": 1781654400,
+      "tvl": 270302816
+    },
+    {
+      "date": 1781740800,
+      "tvl": 268853959
+    },
+    {
+      "date": 1781827200,
+      "tvl": 267904721
+    },
+    {
+      "date": 1781913600,
+      "tvl": 267722866
+    },
+    {
+      "date": 1782000000,
+      "tvl": 268901527
+    },
+    {
+      "date": 1782086400,
+      "tvl": 266678483
+    },
+    {
+      "date": 1782172800,
+      "tvl": 267199934
+    },
+    {
+      "date": 1782259200,
+      "tvl": 264120886
+    },
+    {
+      "date": 1782345600,
+      "tvl": 264662464
+    },
+    {
+      "date": 1782432000,
+      "tvl": 260640211
+    },
+    {
+      "date": 1782518400,
+      "tvl": 260765735
+    },
+    {
+      "date": 1782604800,
+      "tvl": 259865591
+    },
+    {
+      "date": 1782691200,
+      "tvl": 259905421
+    },
+    {
+      "date": 1782777600,
+      "tvl": 250201516
+    },
+    {
+      "date": 1782864000,
+      "tvl": 250254067
+    },
+    {
+      "date": 1782950400,
+      "tvl": 254539033
+    },
+    {
+      "date": 1783036800,
+      "tvl": 255719676
+    },
+    {
+      "date": 1783123200,
+      "tvl": 261473937
+    },
+    {
+      "date": 1783209600,
+      "tvl": 261689548
+    },
+    {
+      "date": 1783296000,
+      "tvl": 261977446
+    },
+    {
+      "date": 1783382400,
+      "tvl": 259187385
+    },
+    {
+      "date": 1783468800,
+      "tvl": 255722265
+    },
+    {
+      "date": 1783555200,
+      "tvl": 255669041
+    },
+    {
+      "date": 1783641600,
+      "tvl": 255339706
+    },
+    {
+      "date": 1783728000,
+      "tvl": 255529434
+    },
+    {
+      "date": 1783814400,
+      "tvl": 255339689
+    },
+    {
+      "date": 1783900800,
+      "tvl": 255700782
+    },
+    {
+      "date": 1783987200,
+      "tvl": 253786363
+    },
+    {
+      "date": 1784073600,
+      "tvl": 256585931
+    },
+    {
+      "date": 1784160000,
+      "tvl": 256109806
+    },
+    {
+      "date": 1784246400,
+      "tvl": 262958807
+    },
+    {
+      "date": 1784332800,
+      "tvl": 262710938
+    },
+    {
+      "date": 1784419200,
+      "tvl": 260650029
+    },
+    {
+      "date": 1784505600,
+      "tvl": 259440024
+    },
+    {
+      "date": 1784592000,
+      "tvl": 259352756
+    },
+    {
+      "date": 1784678400,
+      "tvl": 260397337
+    },
+    {
+      "date": 1784764800,
+      "tvl": 259028447
+    },
+    {
+      "date": 1784851200,
+      "tvl": 257038512
+    },
+    {
+      "date": 1784937600,
+      "tvl": 256040262
+    },
+    {
+      "date": 1785024000,
+      "tvl": 256011348
+    },
+    {
+      "date": 1785110400,
+      "tvl": 257517390
+    },
+    {
+      "date": 1785196800,
+      "tvl": 255703172
+    },
+    {
+      "date": 1785283200,
+      "tvl": 254977930
+    },
+    {
+      "date": 1785369600,
+      "tvl": 253820809
+    },
+    {
+      "date": 1785456000,
+      "tvl": 255144813
+    },
+    {
+      "date": 1785542400,
+      "tvl": 253148835
+    },
+    {
+      "date": 1785628800,
+      "tvl": 252841572
+    },
+    {
+      "date": 1785715200,
+      "tvl": 254181929
+    },
+    {
+      "date": 1785801600,
+      "tvl": 254442999
+    },
+    {
+      "date": 1785888000,
+      "tvl": 253651767
+    },
+    {
+      "date": 1785974400,
+      "tvl": 253723702
+    },
+    {
+      "date": 1786060800,
+      "tvl": 252279109
+    },
+    {
+      "date": 1786147200,
+      "tvl": 250518537
+    },
+    {
+      "date": 1786233600,
+      "tvl": 248665715
+    },
+    {
+      "date": 1786320000,
+      "tvl": 248554330
+    },
+    {
+      "date": 1786406400,
+      "tvl": 244526646
+    },
+    {
+      "date": 1786492800,
+      "tvl": 242279590
+    },
+    {
+      "date": 1786579200,
+      "tvl": 243367370
+    },
+    {
+      "date": 1786665600,
+      "tvl": 244242592
+    },
+    {
+      "date": 1786752000,
+      "tvl": 243895869
+    },
+    {
+      "date": 1786838400,
+      "tvl": 244807596
+    },
+    {
+      "date": 1786924800,
+      "tvl": 243742329
+    },
+    {
+      "date": 1787011200,
+      "tvl": 243908332
+    },
+    {
+      "date": 1787097600,
+      "tvl": 242842511
+    },
+    {
+      "date": 1787184000,
+      "tvl": 250123931
+    },
+    {
+      "date": 1787270400,
+      "tvl": 257299903
+    },
+    {
+      "date": 1787356800,
+      "tvl": 265760014
+    },
+    {
+      "date": 1787443200,
+      "tvl": 263869719
+    },
+    {
+      "date": 1787529600,
+      "tvl": 266975753
+    },
+    {
+      "date": 1787616000,
+      "tvl": 267517306
+    },
+    {
+      "date": 1787702400,
+      "tvl": 265444198
+    },
+    {
+      "date": 1787788800,
+      "tvl": 268751677
+    },
+    {
+      "date": 1787875200,
+      "tvl": 271303674
+    },
+    {
+      "date": 1787961600,
+      "tvl": 265398972
+    },
+    {
+      "date": 1788048000,
+      "tvl": 264343387
+    },
+    {
+      "date": 1788134400,
+      "tvl": 203359213
+    },
+    {
+      "date": 1788220800,
+      "tvl": 257588120
+    },
+    {
+      "date": 1788307200,
+      "tvl": 258763396
+    }
+  ],
+  "protocolsResponse": [
+    {
+      "name": "Tectonic",
+      "category": "Lending",
+      "chainTvls": {
+        "Cronos": 120411256.4256486
+      },
+      "change_1d": -0.2993316239575279,
+      "change_7d": -1.0703612588364138,
+      "url": "https://tectonic.finance/",
+      "logo": "https://icons.llamao.fi/icons/protocols/tectonic",
+      "slug": "tectonic"
+    },
+    {
+      "name": "VVS Standard",
+      "category": "Dexs",
+      "chainTvls": {
+        "Cronos": 97773425.41923396
+      },
+      "change_1d": -2.3885572529183463,
+      "change_7d": -4.493172346261844,
+      "url": "https://vvs.finance",
+      "logo": "https://icons.llamao.fi/icons/protocols/vvs-standard",
+      "slug": "vvs-standard"
+    },
+    {
+      "name": "Crypto.com Liquid Staking",
+      "category": "Liquid Staking",
+      "chainTvls": {
+        "Cronos": 24113360.785686847
+      },
+      "change_1d": -2.6084132435618983,
+      "change_7d": -1.847934041558986,
+      "url": "https://crypto.com/staking",
+      "logo": "https://icons.llamao.fi/icons/protocols/crypto.com-staked-eth",
+      "slug": "crypto.com-liquid-staking"
+    },
+    {
+      "name": "Veno Finance",
+      "category": "Liquid Staking",
+      "chainTvls": {
+        "Cronos": 19426946.840882994
+      },
+      "change_1d": -3.5835248491533918,
+      "change_7d": -5.229619171040753,
+      "url": "https://veno.finance/",
+      "logo": "https://icons.llamao.fi/icons/protocols/veno-finance",
+      "slug": "veno-finance"
+    },
+    {
+      "name": "Moonlander",
+      "category": "Derivatives",
+      "chainTvls": {
+        "Cronos": 18994245.397536445
+      },
+      "change_1d": -0.021035394536383478,
+      "change_7d": -0.7019655017115838,
+      "url": "https://moonlander.trade/",
+      "logo": "https://icons.llamao.fi/icons/protocols/moonlander",
+      "slug": "moonlander"
+    },
+    {
+      "name": "Fulcrom Perps",
+      "category": "Derivatives",
+      "chainTvls": {
+        "Cronos": 11742765.488568792
+      },
+      "change_1d": -1.2168492563067588,
+      "change_7d": -1.5039162424559436,
+      "url": "https://fulcrom.finance",
+      "logo": "https://icons.llamao.fi/icons/protocols/fulcrom-perps",
+      "slug": "fulcrom-perps"
+    },
+    {
+      "name": "Ferro",
+      "category": "Dexs",
+      "chainTvls": {
+        "Cronos": 3541879.5083289635
+      },
+      "change_1d": -0.44429581380993,
+      "change_7d": -1.4960569583183627,
+      "url": "https://ferroprotocol.com",
+      "logo": "https://icons.llamao.fi/icons/protocols/ferro",
+      "slug": "ferro"
+    },
+    {
+      "name": "VVS Flawless",
+      "category": "Dexs",
+      "chainTvls": {
+        "Cronos": 2688010.150353642
+      },
+      "change_1d": -1.2119140923426812,
+      "change_7d": -8.480703855889757,
+      "url": "https://vvs.finance/liquidity",
+      "logo": "https://icons.llamao.fi/icons/protocols/vvs-flawless",
+      "slug": "vvs-flawless"
+    },
+    {
+      "name": "Gate",
+      "category": "CEX",
+      "chainTvls": {
+        "Cronos": 2444006.4124672227
+      },
+      "change_1d": -0.4745568875556927,
+      "change_7d": -0.5372959693621056,
+      "url": "https://www.gate.com",
+      "logo": "https://icons.llamao.fi/icons/protocols/gate",
+      "slug": "gate"
+    },
+    {
+      "name": "Bitget",
+      "category": "CEX",
+      "chainTvls": {
+        "Cronos": 2052551.4441548386
+      },
+      "change_1d": -1.3063414700517768,
+      "change_7d": -1.972518138721,
+      "url": "https://www.bitget.com",
+      "logo": "https://icons.llamao.fi/icons/protocols/bitget",
+      "slug": "bitget"
+    },
+    {
+      "name": "MM Finance Cronos",
+      "category": "Dexs",
+      "chainTvls": {
+        "Cronos": 1269701.7809188424
+      },
+      "change_1d": -2.1696263772714275,
+      "change_7d": -3.677845819196719,
+      "url": "",
+      "logo": "https://icons.llamao.fi/icons/protocols/mm-finance",
+      "slug": "mm-finance-cronos"
+    },
+    {
+      "name": "Beefy",
+      "category": "Yield Aggregator",
+      "chainTvls": {
+        "Cronos": 1227936.3739362725
+      },
+      "change_1d": -1.5233732904060986,
+      "change_7d": -2.7781869785384288,
+      "url": "https://beefy.com",
+      "logo": "https://icons.llamao.fi/icons/protocols/beefy",
+      "slug": "beefy"
+    },
+    {
+      "name": "CGO Finance",
+      "category": "Yield Aggregator",
+      "chainTvls": {
+        "Cronos": 1004716.1181911693
+      },
+      "change_1d": -0.8351668995476302,
+      "change_7d": -2.860783176046951,
+      "url": "",
+      "logo": "https://icons.llamao.fi/icons/protocols/cgo-finance",
+      "slug": "cgo-finance"
+    },
+    {
+      "name": "Autofarm",
+      "category": "Yield Aggregator",
+      "chainTvls": {
+        "Cronos": 483778.09745187423
+      },
+      "change_1d": -0.6245782135354432,
+      "change_7d": -5.912286591195269,
+      "url": "",
+      "logo": "https://icons.llamao.fi/icons/protocols/autofarm",
+      "slug": "autofarm"
+    },
+    {
+      "name": "Ebisus Bay",
+      "category": "Dexs",
+      "chainTvls": {
+        "Cronos": 427976.61486155476
+      },
+      "change_1d": -2.909343248151771,
+      "change_7d": -6.764604903593579,
+      "url": "https://app.ebisusbay.com/",
+      "logo": "https://icons.llamao.fi/icons/protocols/ebisus-bay",
+      "slug": "ebisus-bay"
+    }
+  ]
+}
