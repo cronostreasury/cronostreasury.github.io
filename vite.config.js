@@ -17,6 +17,7 @@ export default defineConfig({
         cronosTokens: `${root}cronos/tokens/index.html`,
         cronosYields: `${root}cronos/yields/index.html`,
         cronosAnalytics: `${root}cronos/analytics/index.html`,
+        cronosSocial: `${root}cronos/social/index.html`,
       },
     },
   },

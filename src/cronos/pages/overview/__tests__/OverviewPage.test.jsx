@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import fixture from "../../../__tests__/fixtures/defillama-cronos.json";
 import OverviewPage from "../OverviewPage.jsx";
+import { loadTwitterWidgets } from "../../../lib/twitterWidgets.js";
+import { FEATURED_ACCOUNT } from "../../../lib/socialAccounts.js";
+
+vi.mock("../../../lib/twitterWidgets.js", () => ({
+  loadTwitterWidgets: vi.fn(),
+}));
 
 function jsonResponse(body, ok = true, status = 200) {
   return { ok, status, json: async () => body };
@@ -23,6 +29,9 @@ describe("OverviewPage", () => {
     // AnimatedNumber's own tests cover count-up timing; here we only care
     // that the right final values render, so force it to resolve instantly.
     vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true }));
+    // TwitterTimelineEmbed's own tests cover the X embed lifecycle; here we
+    // just don't want a real script-load attempt during the page test.
+    loadTwitterWidgets.mockReturnValue(new Promise(() => {}));
   });
 
   afterEach(() => {
@@ -60,5 +69,15 @@ describe("OverviewPage", () => {
     render(<OverviewPage />);
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.getByRole("alert")).toHaveTextContent(/could not load/i);
+  });
+
+  it("renders a compact Social Pulse section for the featured X account regardless of DeFiLlama status", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(jsonResponse(null, false, 500));
+    render(<OverviewPage />);
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+
+    expect(screen.getByText("Social Pulse")).toBeInTheDocument();
+    expect(screen.getByText(`@${FEATURED_ACCOUNT.handle}`)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /view all accounts/i })).toHaveAttribute("href", "/cronos/social/");
   });
 });

@@ -8,6 +8,8 @@ import BarList from "../../components/BarList.jsx";
 import MoversList from "../../components/MoversList.jsx";
 import LiveIndicator from "../../components/LiveIndicator.jsx";
 import Shimmer from "../../components/Shimmer.jsx";
+import TwitterTimelineEmbed from "../../components/TwitterTimelineEmbed.jsx";
+import { FEATURED_ACCOUNT } from "../../lib/socialAccounts.js";
 import {
   fetchChainOverview,
   fetchChainTvlHistory,
@@ -208,6 +210,25 @@ export default function OverviewPage() {
           ))}
         </section>
       )}
+
+      <section className="cronos-section">
+        <h2>Social Pulse</h2>
+        <p className="cronos-section-desc">
+          Live from X, embedded via X's official widgets.js — no API, no scraping ·{" "}
+          <a className="cronos-back" href="/cronos/social/" style={{ margin: 0 }}>
+            View all accounts →
+          </a>
+        </p>
+        <div className="cronos-card">
+          <div className="cronos-card-head">
+            <div>
+              <span className="cronos-card-label">{FEATURED_ACCOUNT.label}</span>
+              <div className="cronos-x-handle">@{FEATURED_ACCOUNT.handle}</div>
+            </div>
+          </div>
+          <TwitterTimelineEmbed handle={FEATURED_ACCOUNT.handle} url={FEATURED_ACCOUNT.url} height={300} />
+        </div>
+      </section>
     </Layout>
   );
 }
