@@ -6,9 +6,9 @@
   "0x0000000000000000000000000000000000000001"
  ],
  "startBlock": 57417829,
- "scannedTo": 93271670,
+ "scannedTo": 93311025,
  "complete": true,
- "updatedAt": "2026-09-11T16:09:25.095Z",
+ "updatedAt": "2026-09-11T20:43:21.529Z",
  "eventCount": 17,
  "totalBurnedWei": "23732711746287978290345848",
  "totalBurned": 23732711.746287975,
